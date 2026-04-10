@@ -1,90 +1,308 @@
 <?php
-@include('config.php');
-@include('src/models/functions.php');
-checkAdmin();
-
-$sql = "SELECT a.account_id, a.full_name, a.email, r.name AS role_name, a.status
-    FROM accounts a
-    JOIN roles r ON r.id = a.role_id
-    ORDER BY a.account_id ASC";
-$ds_taikhoan =  mysqli_query($conn, $sql);
-$ds_taikhoan = mysqli_fetch_all($ds_taikhoan, MYSQLI_ASSOC);
-
-$statusMessage = '';
-if (isset($_GET['status'])) {
-    if ($_GET['status'] === 'deleted') {
-        $statusMessage = '<div class="alert alert-success">Xóa nhân sự thành công.</div>';
-    } elseif ($_GET['status'] === 'reactivated') {
-        $statusMessage = '<div class="alert alert-success">Tài khoản đã được kích hoạt lại.</div>';
-    } elseif ($_GET['status'] === 'deactivated') {
-        $statusMessage = '<div class="alert alert-success">Tài khoản đã lập hóa đơn đã được ngừng hoạt động (không xóa cứng).</div>';
-    } elseif ($_GET['status'] === 'has_invoices') {
-        $statusMessage = '<div class="alert alert-warning">Không thể xóa tài khoản đã lập hóa đơn.</div>';
-    } elseif ($_GET['status'] === 'self_delete') {
-        $statusMessage = '<div class="alert alert-warning">Bạn không thể tự xóa tài khoản đang đăng nhập.</div>';
-    } elseif ($_GET['status'] === 'invalid_id') {
-        $statusMessage = '<div class="alert alert-danger">ID nhân sự không hợp lệ.</div>';
-    } elseif ($_GET['status'] === 'not_found') {
-        $statusMessage = '<div class="alert alert-info">Không tìm thấy nhân sự để xóa.</div>';
-    } elseif ($_GET['status'] === 'error') {
-        $statusMessage = '<div class="alert alert-danger">Có lỗi khi xóa nhân sự. Vui lòng thử lại.</div>';
-    }
-}
+requirePermission(AppPermission::MANAGE_ACCOUNTS);
 ?>
 <div class="dash_board px-2">
-    <h1 class="head-name">NHÂN SỰ</h1>
+    <h1 class="head-name">QUẢN LÝ TÀI KHOẢN HỆ THỐNG</h1>
     <div class="head-line"></div>
-    <div class="container-fluid">
-        <?= $statusMessage ?>
-        <?php if (can(AppPermission::MANAGE_STAFF)) : ?>
-            <div class="text-end">
-
-                <a href="user_page.php?nhansu=them" class="my-2 btn btn-success fw-bolder"><i class="fa-solid fa-file-circle-plus"></i> Thêm users</a>
+    <div class="container-fluid mt-3">
+        <!-- Bảng điều khiển -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <span class="text-muted"><i class="fa-solid fa-circle-info me-2"></i>Vì lý do bảo mật dữ liệu lịch sử, không hỗ trợ chức năng xóa (DELETE) tài khoản. Chỉ có thể Chuyển trạng thái Đang làm/Nghỉ làm.</span>
             </div>
-        <?php endif; ?>
-        <!-- HIEN THI BANG NHAN SU  -->
-        <table id="myTable" class="table container-fluid text-center table-hover table-striped table-bordered">
-            <tr>
-                <!-- <th>Mã số</th> -->
-                <th>ID <i href="" class=" fw-bolder"></i></i></th>
-                <th onclick="sortTable(1)">Tên <i href="" class=" fw-bolder"><i class="p-0 btn fa-solid fa-sort"></i></th>
-                <th onclick="sortTable(2)">email <i href="" class=" fw-bolder"><i class="p-0 btn fa-solid fa-sort"></i></th>
-                <?php
-                if (can(AppPermission::MANAGE_STAFF))
-                    echo "<th>Thao tác</th>";
-                ?>
-                <th>Quyền</th>
-                <th>Trạng thái</th>
-            </tr>
-            <?php foreach ($ds_taikhoan as $tk) : ?>
-                <tr>
-                    <td><?= $tk['account_id'] ?></td>
-                    <td><?= $tk['full_name'] ?></td>
-                    <td><?= $tk['email'] ?></td>
-                    <?php
-                    $isInactive = isset($tk['status']) && $tk['status'] === 'inactive';
-                    if (can(AppPermission::MANAGE_STAFF) && !$isInactive) {
-                        echo '<td><a href="user_page.php?nhansu=sua&id=' . $tk['account_id'] . '"><i class="btn btn-outline-success fa-solid fa-pen"></i> </a>
-                        <a href="user_page.php?nhansu=xoa&id=' . $tk['account_id'] . '" onclick="return confirm(\'Bạn chắc chắn muốn xóa nhân sự này?\')"><i class="btn btn-outline-danger fa-solid fa-trash"></i></a></td>';
-                    } elseif (can(AppPermission::MANAGE_STAFF) && $isInactive) {
-                        echo '<td>
-                        <span class="badge text-bg-secondary">Đã ngừng hoạt động</span>
-                        <a class="btn btn-outline-primary ms-2" href="user_page.php?nhansu=khoiphuc&id=' . $tk['account_id'] . '" onclick="return confirm(\'Bạn muốn kích hoạt lại tài khoản này?\')">
-                            <i class="fa-solid fa-rotate-left"></i>
-                        </a>
-                        </td>';
-                    } else
+            <button class="btn btn-success fw-bold" onclick="openAddModal()">
+                <i class="fa-solid fa-user-plus me-1"></i> Thêm Tài Khoản Mới
+            </button>
+        </div>
 
-                    ?>
-                    <td><?= roleLabel($tk['role_name']) ?></td>
-                    <td><?= $isInactive ? 'Ngừng hoạt động' : 'Hoạt động' ?></td>
-                </tr>
-            <?php endforeach; ?>
-        </table>
-
+        <!-- Bảng hiển thị -->
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-hover table-striped mb-0 text-center align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th width="80">ID</th>
+                            <th class="text-start">Họ tên nhân viên</th>
+                            <th class="text-start">Email đăng nhập</th>
+                            <th>Vai trò (Role)</th>
+                            <th>Trạng thái</th>
+                            <th width="180">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accountsTableBody">
+                        <tr><td colspan="6" class="text-center py-4">Đang tải dữ liệu...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- Modal Thêm/Sửa Tài Khoản -->
+<div class="modal fade" id="modalAccount" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="formAccount" onsubmit="saveAccount(event)">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="modalAccountTitle">Thêm Tài Khoản Mới</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="ac_account_id" name="account_id" value="0">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Họ và tên <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="ac_full_name" required placeholder="Nguyễn Văn A">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Email <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" id="ac_email" required placeholder="nv.a@eldercoffee.com">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Phân quyền (Role) <span class="text-danger">*</span></label>
+                        <select class="form-select" id="ac_role_id" required>
+                            <!-- Options rendered by JS -->
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Mật khẩu <span id="pwdAsterisk" class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="ac_password" placeholder="Nhập mật khẩu">
+                        <div class="form-text" id="ac_password_help">Để trống nếu không muốn đổi mật khẩu.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveAccount">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Lưu thông tin
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
+<!-- Modal Xác Nhận Toggle Status -->
+<div class="modal fade" id="modalToggleStatus" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header text-bg-warning">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-triangle-exclamation"></i> Xác nhận</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <p class="mb-0" id="toggleStatusMsg">Bạn có chắc chắn muốn thay đổi trạng thái?</p>
+                <input type="hidden" id="toggle_account_id">
+                <input type="hidden" id="toggle_new_status">
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-warning fw-bold" onclick="executeToggle()">Đồng ý thay đổi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let accountsData = [];
+let rolesData = [];
+const currentUserId = <?= currentUserId() ?>;
+
+const modalAccount = new bootstrap.Modal(document.getElementById('modalAccount'));
+const modalToggle = new bootstrap.Modal(document.getElementById('modalToggleStatus'));
+const apiUrl = 'api/admin/accounts.php';
+
+// Format status badge
+function renderStatus(status) {
+    if (status === 'active') {
+        return `<span class="badge text-bg-success py-2 w-100"><i class="fa-solid fa-user-check me-1"></i> Đang làm</span>`;
+    }
+    return `<span class="badge text-bg-secondary py-2 w-100"><i class="fa-solid fa-user-xmark me-1"></i> Nghỉ làm</span>`;
+}
+
+// Load danh sách
+async function loadAccounts() {
+    try {
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+        if (data.success) {
+            accountsData = data.data;
+            rolesData = data.roles;
+            renderTable();
+            renderRolesOptions();
+        } else {
+            alert('Lỗi tải dữ liệu: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Fetch error:', error);
+    }
+}
+
+function renderTable() {
+    const tbody = document.getElementById('accountsTableBody');
+    tbody.innerHTML = '';
+    
+    if (accountsData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">Chưa có tài khoản nào.</td></tr>`;
+        return;
+    }
+
+    accountsData.forEach(acc => {
+        const tr = document.createElement('tr');
+        
+        // Nút Sửa
+        const editBtn = `<button class="btn btn-sm btn-outline-primary me-1" title="Sửa thông tin" onclick="openEditModal(${acc.account_id})"><i class="fa-solid fa-pen"></i></button>`;
+        
+        // Nút Toggle Status
+        let toggleBtn = '';
+        if (parseInt(acc.account_id) !== currentUserId) {
+            const nextStatus = (acc.status === 'active') ? 'inactive' : 'active';
+            const icon = acc.status === 'active' ? 'fa-toggle-on text-success' : 'fa-toggle-off text-secondary';
+            const title = acc.status === 'active' ? 'Đánh dấu Nghỉ làm' : 'Đánh dấu Đang làm';
+            toggleBtn = `<button class="btn btn-sm btn-light border" title="${title}" onclick="promptToggle(${acc.account_id}, '${acc.status}', '${acc.full_name}')"><i class="fa-solid ${icon} fs-5 align-middle"></i></button>`;
+        } else {
+            toggleBtn = `<button class="btn btn-sm btn-light border disabled" title="Không thể tự khóa mình"><i class="fa-solid fa-toggle-on text-success fs-5 align-middle opacity-50"></i></button>`;
+        }
+
+        const roleLabelUI = `<span class="fw-medium">${acc.role_name}</span>`;
+
+        tr.innerHTML = `
+            <td class="fw-bold text-muted">#${acc.account_id}</td>
+            <td class="text-start fw-bold text-dark">${acc.full_name}</td>
+            <td class="text-start">${acc.email}</td>
+            <td>${roleLabelUI}</td>
+            <td style="width: 140px;">${renderStatus(acc.status)}</td>
+            <td>${editBtn} ${toggleBtn}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderRolesOptions() {
+    const sel = document.getElementById('ac_role_id');
+    sel.innerHTML = '<option value="">-- Chọn phân quyền --</option>';
+    rolesData.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = r.name;
+        sel.appendChild(opt);
+    });
+}
+
+// Logic form
+function openAddModal() {
+    document.getElementById('formAccount').reset();
+    document.getElementById('ac_account_id').value = 0;
+    document.getElementById('modalAccountTitle').innerText = 'Thêm Tài Khoản Mới';
+    
+    // Yêu cầu nhập mật khẩu khi tạo mới
+    document.getElementById('ac_password').required = true;
+    document.getElementById('pwdAsterisk').style.display = 'inline';
+    document.getElementById('ac_password_help').style.display = 'none';
+
+    modalAccount.show();
+}
+
+function openEditModal(id) {
+    const acc = accountsData.find(x => parseInt(x.account_id) === id);
+    if (!acc) return;
+
+    document.getElementById('formAccount').reset();
+    document.getElementById('ac_account_id').value = acc.account_id;
+    document.getElementById('ac_full_name').value = acc.full_name;
+    document.getElementById('ac_email').value = acc.email;
+    document.getElementById('ac_role_id').value = acc.role_id;
+    
+    document.getElementById('modalAccountTitle').innerText = 'Sửa Thông Tin Tài Khoản: ' + acc.full_name;
+    
+    // Mật khẩu không bắt buộc khi sửa
+    document.getElementById('ac_password').required = false;
+    document.getElementById('pwdAsterisk').style.display = 'none';
+    document.getElementById('ac_password_help').style.display = 'block';
+
+    modalAccount.show();
+}
+
+async function saveAccount(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSaveAccount');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+
+    const id = parseInt(document.getElementById('ac_account_id').value);
+    const payload = {
+        account_id: id,
+        full_name: document.getElementById('ac_full_name').value,
+        email: document.getElementById('ac_email').value,
+        role_id: document.getElementById('ac_role_id').value,
+        password: document.getElementById('ac_password').value
+    };
+
+    const method = id > 0 ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(apiUrl, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        
+        if (result.success) {
+            modalAccount.hide();
+            await loadAccounts(); // Tải lại bảng
+        } else {
+            alert('Lỗi: ' + result.message);
+        }
+    } catch (err) {
+        alert('Lỗi kết nối mạng: ' + err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Lưu thông tin';
+    }
+}
+
+// Logic đổi trạng thái
+function promptToggle(id, currentStatus, name) {
+    const nextText = currentStatus === 'active' ? 'Ngừng hoạt động' : 'Kích hoạt lại làm việc';
+    document.getElementById('toggleStatusMsg').innerHTML = `Đổi trạng thái tài khoản <b>${name}</b> thành <b>${nextText}</b>?`;
+    document.getElementById('toggle_account_id').value = id;
+    document.getElementById('toggle_new_status').value = currentStatus === 'active' ? 'inactive' : 'active';
+    modalToggle.show();
+}
+
+async function executeToggle() {
+    const id = document.getElementById('toggle_account_id').value;
+    const nextStatus = document.getElementById('toggle_new_status').value;
+
+    try {
+        const res = await fetch(apiUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ account_id: id, status: nextStatus })
+        });
+        const result = await res.json();
+        
+        if (result.success) {
+            modalToggle.hide();
+            await loadAccounts();
+        } else {
+            alert('Lỗi: ' + result.message);
+        }
+    } catch (err) {
+        alert('Lỗi kết nối mạng: ' + err);
+    }
+}
+
+// Khởi tạo
+document.addEventListener('DOMContentLoaded', () => {
+    loadAccounts();
+});
+</script>
+</div>
+</div>
 </div>
 </div>

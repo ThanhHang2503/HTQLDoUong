@@ -21,14 +21,14 @@ function checkAdmin()
 
 function checkValidItemID($id)
 {
-	$conn = mysqli_connect('localhost', 'root', 'Z!L9@Wfd', 'eldercoffee_db');
-	$sql = "select * from itemw where item_id = $id";
+	global $conn;
+	$id = (int)$id;
+	$sql = "SELECT item_id FROM items WHERE item_id = $id AND item_status = 'active' LIMIT 1";
 	$result = mysqli_query($conn, $sql);
-	if (mysqli_num_rows($result) > 0) {
+	if ($result && mysqli_num_rows($result) > 0) {
 		return true;
-	} else {
-		return false;
 	}
+	return false;
 }
 
 function kiemtraKHcoTonTai($conn, $customer_name, $phone_number)

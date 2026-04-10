@@ -12,10 +12,12 @@ final class AppPermission
 {
     public const VIEW_DASHBOARD = 'view_dashboard';
     public const MANAGE_CATALOG = 'manage_catalog';
+    public const MANAGE_WAREHOUSE = 'manage_warehouse'; // Quản lý kho
     public const PROCESS_ORDERS = 'process_orders';
     public const MANAGE_CUSTOMERS = 'manage_customers';
     public const VIEW_REPORTS = 'view_reports';
     public const MANAGE_STAFF = 'manage_staff';
+    public const MANAGE_ACCOUNTS = 'manage_accounts'; // Tạo, sửa, đóng lỗi accounts
 }
 
 function getRolePermissions(): array
@@ -24,17 +26,21 @@ function getRolePermissions(): array
         AppRole::ADMIN => [
             AppPermission::VIEW_DASHBOARD,
             AppPermission::MANAGE_CATALOG,
+            AppPermission::MANAGE_WAREHOUSE,
             AppPermission::PROCESS_ORDERS,
             AppPermission::MANAGE_CUSTOMERS,
             AppPermission::VIEW_REPORTS,
             AppPermission::MANAGE_STAFF,
+            AppPermission::MANAGE_ACCOUNTS,
         ],
         AppRole::MANAGER => [
             AppPermission::VIEW_DASHBOARD,
             AppPermission::MANAGE_CATALOG,
+            AppPermission::MANAGE_WAREHOUSE,
             AppPermission::PROCESS_ORDERS,
             AppPermission::MANAGE_CUSTOMERS,
             AppPermission::VIEW_REPORTS,
+            AppPermission::MANAGE_STAFF,
         ],
         AppRole::SALES => [
             AppPermission::VIEW_DASHBOARD,
@@ -44,6 +50,7 @@ function getRolePermissions(): array
         AppRole::WAREHOUSE => [
             AppPermission::VIEW_DASHBOARD,
             AppPermission::MANAGE_CATALOG,
+            AppPermission::MANAGE_WAREHOUSE,
         ],
     ];
 }
@@ -51,13 +58,13 @@ function getRolePermissions(): array
 function roleLabel(string $roleName): string
 {
     $labels = [
-        AppRole::ADMIN => 'Admin',
-        AppRole::MANAGER => 'Quan ly',
-        AppRole::SALES => 'Nhan vien ban hang',
-        AppRole::WAREHOUSE => 'Nhan vien kho',
+        AppRole::ADMIN     => 'Quản trị viên',
+        AppRole::MANAGER   => 'Quản lý',
+        AppRole::SALES     => 'Nhân viên bán hàng',
+        AppRole::WAREHOUSE => 'Nhân viên kho',
     ];
 
-    return $labels[$roleName] ?? 'Khong xac dinh';
+    return $labels[$roleName] ?? 'Không xác định';
 }
 
 function currentRole(): string

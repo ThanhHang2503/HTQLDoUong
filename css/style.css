@@ -26,11 +26,14 @@ a {
   min-width: 220px;
   height: 100vh;
   max-height: 100vh;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: fixed;
   left: 0;
   top: 0;
   z-index: 40;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100,180,100,0.3) transparent;
 }
 
 .app-right {
@@ -164,6 +167,34 @@ a {
 .admin-head {
   color: rgb(2, 80, 2);
   background: #fff;
+}
+
+.nav-section-label {
+  color: rgba(200, 230, 200, 0.6);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 8px 16px 2px;
+  margin-top: 4px;
+}
+
+.navs a.active {
+  background-color: rgb(80, 152, 86);
+  font-weight: 600;
+}
+
+.navs a.active:hover {
+  background-color: rgb(95, 170, 100);
+}
+
+.logout-btn a {
+  color: #ff8080 !important;
+}
+
+.logout-btn a:hover {
+  background-color: rgb(180, 60, 60) !important;
+  color: #fff !important;
 }
 
 .box {
@@ -479,7 +510,7 @@ th {
   margin: 10px 0;
   display: block;
   background: rgb(18, 145, 39);
-  color: #fff;
+  color: #ffffffc4;
   border-radius: 5px;
   font-size: 20px;
   padding: 10px;

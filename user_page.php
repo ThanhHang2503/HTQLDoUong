@@ -6,9 +6,23 @@ require_once __DIR__ . '/src/models/authorization.php';
 
 requireLogin();
 
-if (currentRole() === AppRole::ADMIN) {
-   header('location:admin/index.php');
-   exit;
+// Admin được vào admin panel. Manager/Sales/Warehouse vào user_page
+$current_role = currentRole();
+if ($current_role === AppRole::ADMIN) {
+   // Admin có thể dùng ?admin_panel để vào admin page, nhưng cũng có thể dùng user_page
+   if (!isset($_GET['profile']) && !isset($_GET['chucvu']) && !isset($_GET['bangluong'])
+       && !isset($_GET['donnghi']) && !isset($_GET['donnghiviec']) && !isset($_GET['baocao_nhansu'])
+       && !isset($_GET['baocao_kinhdoanh']) && !isset($_GET['baocao_kho']) && !isset($_GET['backup'])
+       && !isset($_GET['nhansu']) && !isset($_GET['luong_ca_nhan'])) {
+       if (!isset($_GET['home']) && !isset($_GET['sanpham']) && !isset($_GET['phieunhap'])
+           && !isset($_GET['phieuxuat']) && !isset($_GET['kho_thongke']) && !isset($_GET['nhacungcap'])
+           && !isset($_GET['loai']) && !isset($_GET['donhang']) && !isset($_GET['khachhang'])
+           && !isset($_GET['thongke']) && !isset($_GET['timkiem-donhang']) && !isset($_GET['timkiem-khachhang'])
+           && !isset($_GET['timkiem-sanpham']) && !isset($_GET['chucvu_history_api'])) {
+          header('location:admin/index.php');
+          exit;
+       }
+   }
 }
 
 $user_id = currentUserId();
@@ -306,60 +320,10 @@ if (isset($_GET['khachhang'])) {
          break;
    }
 }
-// Them nhan su
-if (!isset($_POST['account_id']) && isset($_POST['full_name']) && isset($_POST['email']) && isset($_POST['password']) && isset($_POST['role_id'])) {
-   requirePermission(AppPermission::MANAGE_STAFF);
-   $full_name = htmlspecialchars($_POST['full_name']);
-   $email = htmlspecialchars($_POST['email']);
-   $password = md5($_POST['password']);
-   $role_id = (int) $_POST['role_id'];
-   $status = isset($_POST['status']) && $_POST['status'] === 'inactive' ? 'inactive' : 'active';
-
-   $insert = "INSERT INTO accounts (full_name, email, password, role_id, status) values('$full_name','$email','$password', $role_id, '$status')";
-   mysqli_query($conn, $insert);
-   header('location:user_page.php?nhansu');
-}
-// Sửa nhân sự
-if (isset($_POST['account_id']) &&  isset($_POST['full_name']) && isset($_POST['email']) && isset($_POST['password']) && isset($_POST['role_id'])) {
-   requirePermission(AppPermission::MANAGE_STAFF);
-   $account_id =  htmlspecialchars($_POST['account_id']);
-   $full_name = htmlspecialchars($_POST['full_name']);
-   $email = $_POST['email'];
-   $password = md5($_POST['password']);
-   $role_id = (int) $_POST['role_id'];
-   $status = isset($_POST['status']) && $_POST['status'] === 'inactive' ? 'inactive' : 'active';
-
-   $update = "UPDATE accounts 
-           SET full_name = '$full_name', email =  '$email', password = '$password', role_id = $role_id, status = '$status' 
-           WHERE account_id = $account_id";
-
-   mysqli_query($conn, $update);
-   header('location:user_page.php?nhansu');
-}
-
 // Phan nhan su --> Dieu huong 
 if (isset($_GET['nhansu'])) {
-   requirePermission(AppPermission::MANAGE_STAFF);
-   switch ($_GET['nhansu']) {
-      case 'them':
-         require_once __DIR__ . '/src/models/them_nhansu.php';
-         break;
-      case 'xoa':
-         require_once __DIR__ . '/src/models/xoa_nhansu.php';
-         break;
-      case 'khoiphuc':
-         require_once __DIR__ . '/src/models/xoa_nhansu.php';
-         break;
-      case 'sua':
-         $id_item = $_GET['id'];
-         require_once __DIR__ . '/src/models/sua_nhansu.php';
-         break;
-      case 'ten_tang_dan':
-
-      default:
-         require_once __DIR__ . '/src/views/nhansu.php';
-         break;
-   }
+   requirePermission(AppPermission::MANAGE_ACCOUNTS);
+   require_once __DIR__ . '/src/views/nhansu.php';
 }
 
 //Phan Loai --> Dieu huong
@@ -546,14 +510,91 @@ if (isset($_GET['phieunhap'])) {
 }
 
 if (isset($_GET['phieuxuat'])) {
-   requirePermission(AppPermission::MANAGE_CATALOG);
-   header('location:user_page.php?phieunhap');
-   exit;
+   requirePermission(AppPermission::MANAGE_WAREHOUSE);
+   require_once __DIR__ . '/src/views/phieuxuat.php';
 }
 
 if (isset($_GET['kho_thongke'])) {
    requirePermission(AppPermission::MANAGE_CATALOG);
    require_once __DIR__ . '/src/views/kho_thongke.php';
+}
+
+// ===== ROUTES MỚI =====
+
+// Hồ sơ cá nhân
+if (isset($_GET['profile'])) {
+   requireLogin();
+   require_once __DIR__ . '/src/views/profile.php';
+}
+
+// Quản lý chức vụ
+if (isset($_GET['chucvu'])) {
+   requirePermission(AppPermission::MANAGE_STAFF);
+   require_once __DIR__ . '/src/views/chucvu.php';
+}
+
+// API lịch sử chức vụ (JSON)
+if (isset($_GET['chucvu_history_api'])) {
+   requireLogin();
+   $acc_id = (int)($_GET['account_id'] ?? 0);
+   if ($acc_id > 0) {
+       $hr = mysqli_query($conn, "SELECT eph.start_date, eph.end_date, p.position_name, eph.reason
+           FROM employee_positions_history eph
+           JOIN positions p ON p.position_id = eph.position_id
+           WHERE eph.account_id = $acc_id ORDER BY eph.start_date DESC");
+       $hist = $hr ? mysqli_fetch_all($hr, MYSQLI_ASSOC) : [];
+   } else { $hist = []; }
+   header('Content-Type: application/json; charset=utf-8');
+   echo json_encode($hist);
+   exit;
+}
+
+// Bảng lương (Manager quản lý)
+if (isset($_GET['bangluong'])) {
+   requirePermission(AppPermission::MANAGE_STAFF);
+   require_once __DIR__ . '/src/views/bangluong.php';
+}
+
+// Lương cá nhân (mọi NV)
+if (isset($_GET['luong_ca_nhan'])) {
+   requireLogin();
+   require_once __DIR__ . '/src/views/luong_ca_nhan.php';
+}
+
+// Đơn nghỉ phép
+if (isset($_GET['donnghi'])) {
+   requireLogin();
+   require_once __DIR__ . '/src/views/donnghi.php';
+}
+
+// Đơn nghỉ việc
+if (isset($_GET['donnghiviec'])) {
+   requireLogin();
+   require_once __DIR__ . '/src/views/donnghiviec.php';
+}
+
+// Báo cáo kho
+if (isset($_GET['baocao_kho'])) {
+   requirePermission(AppPermission::MANAGE_WAREHOUSE);
+   require_once __DIR__ . '/src/views/baocao_kho.php';
+}
+
+// Báo cáo kinh doanh
+if (isset($_GET['baocao_kinhdoanh'])) {
+   requirePermission(AppPermission::VIEW_REPORTS);
+   require_once __DIR__ . '/src/views/baocao_kinhdoanh.php';
+}
+
+// Báo cáo nhân sự
+if (isset($_GET['baocao_nhansu'])) {
+   requirePermission(AppPermission::MANAGE_STAFF);
+   require_once __DIR__ . '/src/views/baocao_nhansu.php';
+}
+
+// Sao lưu & Phục hồi
+if (isset($_GET['backup'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+   require_once __DIR__ . '/src/views/backup.php';
 }
 
 renderAppLayoutEnd();

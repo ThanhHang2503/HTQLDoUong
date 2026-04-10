@@ -41,8 +41,8 @@ if (isset($_POST['submit'])) {
    <meta charset="UTF-8">
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-   <link rel="shortcut icon" href="img/logo.jfif">
-   <title>ÔNG GIÀ XIN CHÀO</title>
+   <link rel="shortcut icon" href="img/logo.jpg">
+   <title>Quản Lý Đồ Uống</title>
    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
 
    <!-- custom css file link  -->
@@ -56,7 +56,7 @@ if (isset($_POST['submit'])) {
       <div class="form-container">
          <form action="" method="post">
             <h1 class="fw-bolder ">ĐĂNG NHẬP</h1>
-            <img class="img-fluid" width="120px" style="border-radius:100%" src="img/logo.jfif" alt="">
+            <img class="img-fluid" width="120px" style="border-radius:100%" src="img/logo.jpg" alt="">
             <?php
             if (isset($error)) {
                foreach ($error as $error) {
@@ -64,15 +64,10 @@ if (isset($_POST['submit'])) {
                };
             };
 
-            if (isset($_SESSION['dang-ky-thanh-cong'])) {
-               echo $_SESSION['dang-ky-thanh-cong'];
-               unset($_SESSION['dang-ky-thanh-cong']);
-            }
             ?>
             <input type="email" name="email" required placeholder="Nhập vào mail của bạn">
             <input type="password" name="password" required placeholder="Nhập vào password">
             <input type="submit" name="submit" value="Đăng nhập" class="form-btn btn">
-            <p>Bạn chưa có tài khoản? <a href="register.php">Đăng kí ngay</a></p>
          </form>
 
       </div>

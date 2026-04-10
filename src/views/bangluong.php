@@ -1,0 +1,363 @@
+<?php
+// Bảng lương - Manager tính và lưu lương cho nhân viên
+requirePermission(AppPermission::MANAGE_STAFF);
+global $conn;
+
+$msg_success = '';
+$msg_error   = '';
+
+$sel_month = (int)($_GET['month'] ?? date('m'));
+$sel_year  = (int)($_GET['year'] ?? date('Y'));
+$sel_year  = max(2020, min($sel_year, 2030));
+
+// Lưu/cập nhật lương
+if (isset($_POST['save_salary'])) {
+    $acc_id     = (int)($_POST['account_id'] ?? 0);
+    $month      = (int)($_POST['salary_month'] ?? $sel_month);
+    $year       = (int)($_POST['salary_year'] ?? $sel_year);
+    $allowance  = (int)($_POST['allowance'] ?? 0);
+    $bonus      = (int)($_POST['bonus'] ?? 0);
+    $deductions = (int)($_POST['deductions'] ?? 0);
+    $notes      = trim(mysqli_real_escape_string($conn, $_POST['notes'] ?? ''));
+    $by         = currentUserId();
+
+    if ($acc_id > 0) {
+        $call = "CALL CalculateEmployeeSalary($acc_id, $month, $year, $allowance, $bonus, $deductions, $by, '$notes')";
+        if (mysqli_multi_query($conn, $call)) {
+            do { $r = mysqli_store_result($conn); if ($r) mysqli_free_result($r); } while (mysqli_more_results($conn) && mysqli_next_result($conn));
+            $msg_success = 'Đã tính và lưu lương thành công.';
+        } else {
+            $msg_error = 'Lỗi: ' . mysqli_error($conn);
+        }
+    }
+}
+
+// Xóa bản ghi lương
+if (isset($_POST['delete_salary'])) {
+    $sid = (int)($_POST['salary_record_id'] ?? 0);
+    mysqli_query($conn, "DELETE FROM salary_records WHERE salary_record_id=$sid");
+    $msg_success = 'Đã xóa bản ghi lương.';
+}
+
+// Danh sách nhân viên (để tính lương)
+$emp_sql = "SELECT a.account_id, a.full_name, r.display_name AS role_name,
+                   p.position_name, p.base_salary
+            FROM accounts a
+            JOIN roles r ON r.id = a.role_id
+            LEFT JOIN positions p ON p.position_id = a.position_id
+            WHERE a.status = 'active' AND a.role_id != 1
+            ORDER BY a.full_name";
+$emp_result = mysqli_query($conn, $emp_sql);
+$employees = $emp_result ? mysqli_fetch_all($emp_result, MYSQLI_ASSOC) : [];
+
+// Bản ghi lương tháng đã chọn (dùng view)
+$salary_sql = "SELECT sr.salary_record_id, sr.account_id, sr.salary_month, sr.salary_year,
+                      sr.base_salary, sr.allowance, sr.bonus, sr.deductions, sr.total_salary,
+                      sr.notes, sr.updated_at,
+                      a.full_name, r.display_name AS role_name, p.position_name
+               FROM salary_records sr
+               JOIN accounts a ON a.account_id = sr.account_id
+               JOIN roles r ON r.id = a.role_id
+               JOIN positions p ON p.position_id = sr.position_id
+               WHERE sr.salary_month = $sel_month AND sr.salary_year = $sel_year
+               ORDER BY a.full_name";
+$salary_result = mysqli_query($conn, $salary_sql);
+$salary_records = $salary_result ? mysqli_fetch_all($salary_result, MYSQLI_ASSOC) : [];
+
+// Tính lại bảng nhân viên chưa có lương tháng này
+$has_salary = array_column($salary_records, 'account_id');
+$missing_employees = array_filter($employees, fn($e) => !in_array($e['account_id'], $has_salary));
+
+// Thống kê tổng
+$total_base   = array_sum(array_column($salary_records, 'base_salary'));
+$total_allow  = array_sum(array_column($salary_records, 'allowance'));
+$total_bonus  = array_sum(array_column($salary_records, 'bonus'));
+$total_deduct = array_sum(array_column($salary_records, 'deductions'));
+$total_pay    = array_sum(array_column($salary_records, 'total_salary'));
+
+// Nếu in
+if (isset($_GET['print'])) {
+    header('Content-Type: text/html; charset=utf-8');
+    ?>
+    <!DOCTYPE html><html lang="vi">
+    <head><meta charset="UTF-8"><title>Bảng Lương <?= $sel_month ?>/<?= $sel_year ?></title>
+    <style>
+    body{font-family:Arial,sans-serif;margin:20px;font-size:12px}
+    h2,h3{text-align:center}table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid #333;padding:5px 8px;text-align:center}
+    th{background:#f0f0f0}tfoot tr{font-weight:bold;background:#fff9c4}
+    .tr{text-align:right}
+    </style></head><body>
+    <h2>BẢNG LƯƠNG THÁNG <?= $sel_month ?>/<?= $sel_year ?></h2>
+    <h3>Công ty ElderCoffee</h3>
+    <table>
+    <thead><tr><th>#</th><th>Họ tên</th><th>Chức vụ</th><th>Lương CB</th><th>Phụ cấp</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực lĩnh</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+    <?php $i=1; foreach ($salary_records as $sr): ?>
+    <tr><td><?=$i++?></td><td style="text-align:left"><?=htmlspecialchars($sr['full_name'])?></td>
+    <td><?=htmlspecialchars($sr['position_name'])?></td>
+    <td class="tr"><?=number_format($sr['base_salary'],0,',','.')?></td>
+    <td class="tr"><?=number_format($sr['allowance'],0,',','.')?></td>
+    <td class="tr"><?=number_format($sr['bonus'],0,',','.')?></td>
+    <td class="tr"><?=number_format($sr['deductions'],0,',','.')?></td>
+    <td class="tr"><b><?=number_format($sr['total_salary'],0,',','.')?></b></td>
+    <td><?=htmlspecialchars($sr['notes']??'')?></td></tr>
+    <?php endforeach; ?>
+    </tbody>
+    <tfoot><tr><td colspan="3">TỔNG CỘNG</td>
+    <td class="tr"><?=number_format($total_base,0,',','.')?></td>
+    <td class="tr"><?=number_format($total_allow,0,',','.')?></td>
+    <td class="tr"><?=number_format($total_bonus,0,',','.')?></td>
+    <td class="tr"><?=number_format($total_deduct,0,',','.')?></td>
+    <td class="tr"><?=number_format($total_pay,0,',','.')?></td>
+    <td></td></tr></tfoot>
+    </table>
+    <p>Ngày in: <?=date('d/m/Y H:i')?></p>
+    <script>window.print()</script></body></html>
+    <?php
+    exit;
+}
+?>
+
+<div class="dash_board px-2">
+    <h1 class="head-name">BẢNG LƯƠNG NHÂN VIÊN</h1>
+    <div class="head-line"></div>
+
+    <?php if ($msg_success): ?>
+        <div class="alert alert-success"><?= htmlspecialchars($msg_success) ?></div>
+    <?php endif; ?>
+    <?php if ($msg_error): ?>
+        <div class="alert alert-danger"><?= htmlspecialchars($msg_error) ?></div>
+    <?php endif; ?>
+
+    <!-- Bộ lọc tháng/năm -->
+    <div class="row g-2 align-items-end mt-2 mb-3">
+        <div class="col-auto">
+            <form class="d-flex gap-2 align-items-end" method="GET" action="user_page.php">
+                <input type="hidden" name="bangluong" value="1">
+                <div>
+                    <label class="form-label mb-0">Tháng</label>
+                    <select class="form-select" name="month" style="width:110px">
+                        <?php for ($m=1;$m<=12;$m++): ?>
+                        <option value="<?=$m?>" <?=$m==$sel_month?'selected':''?>>Tháng <?=$m?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label mb-0">Năm</label>
+                    <input type="number" class="form-control" name="year" value="<?=$sel_year?>" style="width:90px">
+                </div>
+                <button class="btn btn-primary" type="submit"><i class="fa-solid fa-filter"></i> Xem</button>
+            </form>
+        </div>
+        <div class="col-auto ms-auto">
+            <a class="btn btn-outline-secondary"
+               href="user_page.php?bangluong&month=<?=$sel_month?>&year=<?=$sel_year?>&print=1" target="_blank">
+                <i class="fa-solid fa-print me-1"></i>In bảng lương
+            </a>
+        </div>
+    </div>
+
+    <!-- Tóm tắt thống kê -->
+    <div class="row g-2 mb-3">
+        <div class="col-md-2">
+            <div class="card text-center border-primary">
+                <div class="card-body p-2">
+                    <div class="fs-5 fw-bold text-primary"><?= count($salary_records) ?></div>
+                    <small>Đã tính lương</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center border-warning">
+                <div class="card-body p-2">
+                    <div class="fs-5 fw-bold text-warning"><?= count($missing_employees) ?></div>
+                    <small>Chưa tính lương</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-success">
+                <div class="card-body p-2">
+                    <div class="fs-6 fw-bold text-success"><?= number_format($total_pay,0,',','.') ?></div>
+                    <small>Tổng quỹ lương (VND)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center border-info">
+                <div class="card-body p-2">
+                    <div class="fs-6 fw-bold text-info"><?= number_format($total_bonus,0,',','.') ?></div>
+                    <small>Tổng thưởng (VND)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Form tính lương -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold bg-success text-white">
+                    <i class="fa-solid fa-calculator me-2"></i>Tính Lương Nhân Viên
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="" id="salaryForm">
+                        <input type="hidden" name="salary_month" value="<?= $sel_month ?>">
+                        <input type="hidden" name="salary_year" value="<?= $sel_year ?>">
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Nhân viên</label>
+                            <select class="form-select" name="account_id" id="empSelect" required onchange="fillBaseSalary(this)">
+                                <option value="">-- Chọn nhân viên --</option>
+                                <?php foreach ($employees as $emp): ?>
+                                <option value="<?= $emp['account_id'] ?>"
+                                        data-salary="<?= $emp['base_salary'] ?>"
+                                        data-pos="<?= htmlspecialchars($emp['position_name'] ?? '') ?>">
+                                    <?= htmlspecialchars($emp['full_name']) ?>
+                                    <?= in_array($emp['account_id'], $has_salary) ? '✓' : '' ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Lương cơ bản (tự động)</label>
+                            <input type="text" class="form-control bg-light" id="baseSalaryDisplay" disabled>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Phụ cấp (VND)</label>
+                            <input type="number" class="form-control" name="allowance" id="allowanceInput"
+                                   value="500000" min="0" step="100000" onchange="calcTotal()">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Thưởng (VND)</label>
+                            <input type="number" class="form-control" name="bonus" id="bonusInput"
+                                   value="0" min="0" step="100000" onchange="calcTotal()">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Khấu trừ (VND)</label>
+                            <input type="number" class="form-control" name="deductions" id="deductInput"
+                                   value="0" min="0" step="100000" onchange="calcTotal()">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Thực lĩnh (ước tính)</label>
+                            <input type="text" class="form-control fw-bold text-success bg-light" id="totalDisplay" disabled>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Ghi chú</label>
+                            <input type="text" class="form-control" name="notes" placeholder="Ghi chú lương tháng này...">
+                        </div>
+                        <button type="submit" name="save_salary" class="btn btn-success w-100 fw-bold">
+                            <i class="fa-solid fa-floppy-disk me-1"></i>Lưu lương tháng <?= $sel_month ?>/<?= $sel_year ?>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bảng lương đã tính -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold">
+                    <i class="fa-solid fa-table me-2"></i>Bảng Lương Tháng <?= $sel_month ?>/<?= $sel_year ?>
+                    <?php if (count($missing_employees) > 0): ?>
+                    <span class="badge text-bg-warning ms-2"><?= count($missing_employees) ?> NV chưa tính</span>
+                    <?php endif; ?>
+                </div>
+                <div class="card-body p-0">
+                    <?php if (empty($salary_records)): ?>
+                        <div class="p-3 text-muted">Chưa có bản ghi lương nào cho tháng <?= $sel_month ?>/<?= $sel_year ?>.
+                        <br>Hãy sử dụng form bên trái để tính lương cho từng nhân viên.</div>
+                    <?php else: ?>
+                    <div class="table-responsive">
+                    <table class="table table-striped table-hover table-bordered mb-0 text-center table-sm">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Nhân viên</th>
+                                <th>Lương CB</th>
+                                <th>Phụ cấp</th>
+                                <th>Thưởng</th>
+                                <th>Khấu trừ</th>
+                                <th class="text-success">Thực lĩnh</th>
+                                <th>Ghi chú</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($salary_records as $sr): ?>
+                            <tr>
+                                <td class="text-start">
+                                    <b><?= htmlspecialchars($sr['full_name']) ?></b><br>
+                                    <small class="text-muted"><?= htmlspecialchars($sr['position_name']) ?></small>
+                                </td>
+                                <td><?= number_format($sr['base_salary'],0,',','.') ?></td>
+                                <td class="text-primary"><?= number_format($sr['allowance'],0,',','.') ?></td>
+                                <td class="text-success"><?= number_format($sr['bonus'],0,',','.') ?></td>
+                                <td class="text-danger"><?= $sr['deductions'] > 0 ? '-' . number_format($sr['deductions'],0,',','.') : '0' ?></td>
+                                <td class="fw-bold text-success"><?= number_format($sr['total_salary'],0,',','.') ?></td>
+                                <td><?= htmlspecialchars($sr['notes'] ?? '') ?></td>
+                                <td>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Xóa bản ghi lương này?')">
+                                        <input type="hidden" name="salary_record_id" value="<?= $sr['salary_record_id'] ?>">
+                                        <button type="submit" name="delete_salary" class="btn btn-sm btn-outline-danger">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                        <tfoot class="table-warning fw-bold">
+                            <tr>
+                                <td class="text-end">TỔNG:</td>
+                                <td><?= number_format($total_base,0,',','.') ?></td>
+                                <td><?= number_format($total_allow,0,',','.') ?></td>
+                                <td><?= number_format($total_bonus,0,',','.') ?></td>
+                                <td><?= number_format($total_deduct,0,',','.') ?></td>
+                                <td class="text-success"><?= number_format($total_pay,0,',','.') ?></td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Nhân viên chưa được tính lương -->
+            <?php if (!empty($missing_employees)): ?>
+            <div class="card shadow-sm mt-3 border-warning">
+                <div class="card-header fw-bold text-warning">
+                    <i class="fa-solid fa-exclamation-triangle me-2"></i>Nhân Viên Chưa Tính Lương
+                </div>
+                <div class="card-body py-2">
+                    <?php foreach ($missing_employees as $me): ?>
+                    <span class="badge text-bg-warning me-1 mb-1 fs-6"><?= htmlspecialchars($me['full_name']) ?></span>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<script>
+function fillBaseSalary(sel) {
+    const option = sel.options[sel.selectedIndex];
+    const salary = parseInt(option.dataset.salary) || 0;
+    document.getElementById('baseSalaryDisplay').value = salary.toLocaleString('vi-VN') + ' VND';
+    window._baseSalary = salary;
+    calcTotal();
+}
+function calcTotal() {
+    const base = window._baseSalary || 0;
+    const allow = parseInt(document.getElementById('allowanceInput').value) || 0;
+    const bonus = parseInt(document.getElementById('bonusInput').value) || 0;
+    const deduct = parseInt(document.getElementById('deductInput').value) || 0;
+    const total = base + allow + bonus - deduct;
+    document.getElementById('totalDisplay').value = total.toLocaleString('vi-VN') + ' VND';
+}
+</script>
+</div>
+</div>
+</div>
+</div>

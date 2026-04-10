@@ -47,7 +47,7 @@ if (isset($_GET['donhang']) && isset($_GET['id'])) {
     <div id='bill' class="col-6 text-dark bg-light p-5 bill">
         <h2 class="text-center fw-bold">ÔNG GIÀ COFFEE</h2>
         <div class=" row justify-content-center">
-            <img style="border-radius: 50%;" src="img/logo.jfif" alt="Logo" class="col-3">
+            <img style="border-radius: 50%;" src="img/logo.jpg" alt="Logo" class="col-3">
         </div>
         <p class="text-center">Số 12, Đường Mậu Thân, Phường An Hòa, Quận Ninh Kiều, Thành Phố Cần Thơ</p>
         <hr>
