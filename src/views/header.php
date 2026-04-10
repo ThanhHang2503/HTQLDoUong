@@ -14,17 +14,51 @@
 
 </head>
 
-<body class="row">
-    <div class="nav-side col-2 p-0 sticky-top">
+<?php
+$roleName = currentRole();
+$isWarehouseRole = $roleName === AppRole::WAREHOUSE;
+$isSalesRole = $roleName === AppRole::SALES;
+$isManagerRole = $roleName === AppRole::MANAGER;
+$isAdminRole = $roleName === AppRole::ADMIN;
+?>
+<?php
+$currentTitle = 'Trang chủ';
+if (isset($_GET['home'])) {
+    $currentTitle = 'Trang chủ';
+} elseif (isset($_GET['dashboard'])) {
+    $currentTitle = 'Trang chủ';
+} elseif (isset($_GET['sanpham'])) {
+    $currentTitle = 'Sản phẩm';
+} elseif (isset($_GET['phieunhap'])) {
+    $currentTitle = 'Phiếu nhập';
+} elseif (isset($_GET['kho_thongke'])) {
+    $currentTitle = 'Thống kê tồn kho';
+} elseif (isset($_GET['nhacungcap'])) {
+    $currentTitle = 'Quản lý nhà cung cấp';
+} elseif (isset($_GET['loai'])) {
+    $currentTitle = 'Loại sản phẩm';
+} elseif (isset($_GET['donhang'])) {
+    $currentTitle = 'Đơn hàng';
+} elseif (isset($_GET['khachhang'])) {
+    $currentTitle = 'Khách hàng';
+} elseif (isset($_GET['nhansu'])) {
+    $currentTitle = 'Nhân sự';
+} elseif (isset($_GET['thongke'])) {
+    $currentTitle = 'Thống kê';
+}
+?>
+
+<body class="app-shell">
+    <div class="nav-side p-0">
         <div class="logo p-1 justify-content-center text-center">
-            <a href="user_page.php?dashboard"> <img width="30%" src="img/logo.jfif" alt="Logo"></a>
+            <a href="user_page.php?home"> <img src="img/logo.jfif" alt="Logo"></a>
         </div>
 
         <div class="navs pt-3">
             <div class="container-fluid">
-                <a class="text-truncate" href="user_page.php?dashboard"><i class="fa-solid fa-house-chimney"></i> DashBoard</a>
+                <a class="text-truncate" href="user_page.php?home"><i class="fa-solid fa-house-chimney"></i> Home</a>
             </div>
-            <?php if (can(AppPermission::MANAGE_CATALOG)) : ?>
+            <?php if ($isWarehouseRole || $isManagerRole || $isAdminRole) : ?>
                 <div class="container-fluid">
                     <a class="text-truncate" href="user_page.php?loai"><i class="fa-solid fa-list"></i> Loại</a>
                 </div>
@@ -32,12 +66,26 @@
                     <a class="text-truncate" href="user_page.php?sanpham"><i class="fa-solid fa-mug-hot"></i> Sản Phẩm</a>
                 </div>
             <?php endif; ?>
-            <?php if (can(AppPermission::PROCESS_ORDERS)) : ?>
+
+            <?php if ($isWarehouseRole || $isAdminRole) : ?>
+                <div class="container-fluid">
+                    <a class="text-truncate" href="user_page.php?phieunhap"><i class="fa-solid fa-file-import"></i> Phiếu nhập</a>
+                </div>
+                <div class="container-fluid">
+                    <a class="text-truncate" href="user_page.php?nhacungcap"><i class="fa-solid fa-truck-field"></i> Quản lý nhà cung cấp</a>
+                </div>
+                <div class="container-fluid">
+                    <a class="text-truncate" href="user_page.php?kho_thongke"><i class="fa-solid fa-warehouse"></i> Thống kê tồn kho</a>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($isSalesRole || $isManagerRole || $isAdminRole) : ?>
                 <div class="container-fluid">
                     <a class="text-truncate" href="user_page.php?donhang"><i class="fa-solid fa-receipt"></i> Đơn hàng</a>
                 </div>
             <?php endif; ?>
-            <?php if (can(AppPermission::MANAGE_CUSTOMERS)) : ?>
+
+            <?php if ($isSalesRole || $isManagerRole || $isAdminRole) : ?>
                 <div class="container-fluid">
                     <a class="text-truncate" href="user_page.php?khachhang"><i class="fa-solid fa-address-book"></i> Khách hàng</a>
                 </div>
@@ -45,18 +93,18 @@
         </div>
 
 
-        <?php if (can(AppPermission::MANAGE_STAFF) || can(AppPermission::VIEW_REPORTS)) : ?>
+        <?php if ($isManagerRole || $isAdminRole) : ?>
             <hr>
             <div class="container-fluid admin-head">
                 <h5 class="text-center py-2 fw-bold">Quản Lý</h5>
             </div>
             <div class="navs text-center p-0">
-                <?php if (can(AppPermission::MANAGE_STAFF)) : ?>
+                <?php if ($isAdminRole) : ?>
                     <div class="container-fluid">
                         <a class="text-truncate" href="user_page.php?nhansu"><i class="fa-solid fa-users"></i> Nhân sự</a>
                     </div>
                 <?php endif; ?>
-                <?php if (can(AppPermission::VIEW_REPORTS)) : ?>
+                <?php if ($isManagerRole || $isAdminRole) : ?>
                     <div class="container-fluid">
                         <a class="text-truncate" href="user_page.php?thongke"><i class="fa-solid fa-coins"></i> Thống kê</a>
                     </div>
@@ -77,4 +125,9 @@
         </div>
 
     </div>
-    <div class="main col-10 p-0">
+
+    <div class="app-right">
+        <div class="app-topbar px-3">
+            <h4 class="mb-0 fw-bold"><?= htmlspecialchars($currentTitle) ?></h4>
+        </div>
+        <div class="main p-0">

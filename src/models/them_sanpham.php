@@ -31,10 +31,6 @@ if (isset($_GET['sanpham']) && $_GET['sanpham'] == 'them') :
                                 <label for="description">Mô tả:</label>
                                 <textarea required maxlength="100" class="form-control" id="description" name="description" rows="3"></textarea>
                             </div>
-                            <div class="form-group">
-                                <label for="unit_price">Đơn giá:</label>
-                                <input required type="number" class="form-control" id="unit_price" name="unit_price" required>
-                            </div>
                             <button type="submit" class="mt-4 btn btn-success">Thêm sản phẩm</button>
                         </form>
                     </div>

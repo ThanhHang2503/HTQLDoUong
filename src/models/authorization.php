@@ -102,7 +102,7 @@ function requirePermission(string $permission): void
 {
     requireLogin();
     if (!can($permission)) {
-        header('location:user_page.php?dashboard&error=forbidden');
+        header('location:user_page.php?home&error=forbidden');
         exit;
     }
 }
@@ -111,7 +111,7 @@ function requireRole(string $roleName): void
 {
     requireLogin();
     if (currentRole() !== $roleName) {
-        header('location:user_page.php?dashboard&error=forbidden');
+        header('location:user_page.php?home&error=forbidden');
         exit;
     }
 }

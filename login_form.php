@@ -23,7 +23,7 @@ if (isset($_POST['submit'])) {
       if ($row['role_name'] === AppRole::ADMIN) {
          header('location:admin/index.php');
       } else {
-         header('location:user_page.php?dashboard');
+         header('location:user_page.php?home');
       }
       exit;
    } else {

@@ -1,18 +1,29 @@
 <?php
 
 if(isset($_GET['sanpham']) && $_GET['sanpham']=='xoa'){
-    try{
-    $id=$_GET['id'];
-    $sql="delete from items where item_id=$id";
-    $result=mysqli_query($conn,$sql);
-    if($result){
-        echo "<script>alert('Xóa thành công');</script>";
-        echo "<script>window.location.href='user_page.php?sanpham';</script>";
+    $id = (int)($_GET['id'] ?? 0);
+
+    if ($id <= 0) {
+        $_SESSION['product_delete_error'] = 'Sản phẩm không hợp lệ.';
+        header('location:user_page.php?sanpham');
+        exit;
     }
-    }catch(Exception $e){
-        echo "<script>confirm('Không thể xóa, sản phẩm đang có trong các hóa đơn. Vui lòng xóa sản phẩm khác')</script>";
-        echo "<script>window.location.href='user_page.php?sanpham';</script>";
+
+    try {
+        $sql = "DELETE FROM items WHERE item_id = {$id}";
+        $result = mysqli_query($conn, $sql);
+
+        if ($result) {
+            $_SESSION['product_delete_success'] = 'Xóa sản phẩm thành công.';
+        } else {
+            $_SESSION['product_delete_error'] = 'Không thể xóa sản phẩm.';
+        }
+    } catch (\Throwable $e) {
+        $_SESSION['product_delete_error'] = 'Không thể xóa sản phẩm vì đang phát sinh dữ liệu nhập/xuất/đơn hàng liên quan.';
     }
+
+    header('location:user_page.php?sanpham');
+    exit;
     
 }
 

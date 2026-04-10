@@ -30,7 +30,8 @@ if (!$row) {
 $user_name = $row['full_name'];
 $_SESSION['role_name'] = $row['role_name'];
 
-require_once __DIR__ . '/src/views/header.php';
+require_once __DIR__ . '/src/views/layout.php';
+renderAppLayoutStart($user_name);
 ?>
 
 <?php
@@ -54,18 +55,20 @@ if (isset($_GET['timkiem-sanpham'])) {
    require_once __DIR__ . '/src/views/sanpham.php';
 } 
 
+if (empty($_GET)) {
+   header('location:user_page.php?home');
+   exit;
+}
+
+if (isset($_GET['home'])) {
+   requireLogin();
+   require_once __DIR__ . '/src/views/home.php';
+}
+
 
 if (isset($_GET['dashboard'])) {
-   requirePermission(AppPermission::VIEW_DASHBOARD);
-   switch ($_GET['dashboard']) {
-         // case 'dashboard':
-         //    require_once __DIR__. '/src/views/dashboard.php';
-         //    break;
-         // Các trường hợp xử lý với yêu cầu get
-      default:
-         require_once __DIR__ . '/src/views/dashboard.php';
-         break;
-   }
+   header('location:user_page.php?home');
+   exit;
 }
 
 // Thêm khách hàng
@@ -101,14 +104,24 @@ if (isset($_POST['category_id']) && isset($_POST['category_name'])) {
 // phan san pham 
 
 //Thêm sản phẩm
-if (!isset($_POST['item_id']) && isset($_POST['item_name']) && isset($_POST['category_id']) && isset($_POST['description']) && isset($_POST['unit_price'])) {
+if (!isset($_POST['item_id']) && isset($_POST['item_name']) && isset($_POST['category_id']) && isset($_POST['description'])) {
    requirePermission(AppPermission::MANAGE_CATALOG);
-   $item_name = $_POST['item_name'];
-   $category_id = $_POST['category_id'];
-   $description = $_POST['description'];
-   $unit_price = $_POST['unit_price'];
+   $item_name = trim((string)$_POST['item_name']);
+   $category_id = (int)$_POST['category_id'];
+   $description = trim((string)$_POST['description']);
+   $purchase_price = 0;
+   $unit_price = 0;
+   $stock_quantity = 0;
 
-   $insert = "INSERT INTO items (item_name, category_id, description, unit_price) values('$item_name','$category_id','$description', '$unit_price')";
+   if ($item_name === '' || $description === '' || $category_id <= 0) {
+      echo "<script>alert('Vui lòng nhập đầy đủ thông tin sản phẩm hợp lệ (tên, danh mục, mô tả).');</script>";
+      echo "<script>window.location.href='user_page.php?sanpham=them';</script>";
+      exit;
+   }
+
+   $safe_name = mysqli_real_escape_string($conn, $item_name);
+   $safe_description = mysqli_real_escape_string($conn, $description);
+   $insert = "INSERT INTO items (item_name, category_id, description, unit_price, purchase_price, stock_quantity, item_status) values('{$safe_name}', {$category_id}, '{$safe_description}', {$unit_price}, {$purchase_price}, {$stock_quantity}, 'active')";
    mysqli_query($conn, $insert);
    header('location:user_page.php?sanpham');
 }
@@ -148,6 +161,106 @@ if (isset($_GET['sanpham'])) {
          require_once __DIR__ . '/src/views/sanpham.php';
          break;
    }
+}
+
+if (isset($_POST['supplier_submit'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+
+   $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
+   $contact_name = trim((string)($_POST['contact_name'] ?? ''));
+   $phone_number = trim((string)($_POST['phone_number'] ?? ''));
+   $email = trim((string)($_POST['email'] ?? ''));
+   $address = trim((string)($_POST['address'] ?? ''));
+
+   if ($supplier_name === '') {
+      $_SESSION['supplier_error'] = 'Tên nhà cung cấp là bắt buộc.';
+      header('location:user_page.php?nhacungcap');
+      exit;
+   }
+
+   $supplier_code = 'SUP-' . date('YmdHis') . '-' . rand(100, 999);
+   $safe_code = mysqli_real_escape_string($conn, $supplier_code);
+   $safe_name = mysqli_real_escape_string($conn, $supplier_name);
+   $safe_contact = mysqli_real_escape_string($conn, $contact_name);
+   $safe_phone = mysqli_real_escape_string($conn, $phone_number);
+   $safe_email = mysqli_real_escape_string($conn, $email);
+   $safe_address = mysqli_real_escape_string($conn, $address);
+
+   $insert = "INSERT INTO suppliers (supplier_code, supplier_name, contact_name, phone_number, email, address, status)
+              VALUES ('{$safe_code}', '{$safe_name}', '{$safe_contact}', '{$safe_phone}', '{$safe_email}', '{$safe_address}', 'active')";
+
+   try {
+      mysqli_query($conn, $insert);
+      $_SESSION['supplier_success'] = 'Thêm nhà cung cấp thành công.';
+   } catch (\Throwable $e) {
+      $_SESSION['supplier_error'] = 'Không thể thêm nhà cung cấp. Vui lòng kiểm tra dữ liệu trùng.';
+   }
+
+   header('location:user_page.php?nhacungcap');
+   exit;
+}
+
+if (isset($_POST['supplier_update_submit'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+
+   $supplier_id = (int)($_POST['supplier_id'] ?? 0);
+   $supplier_name = trim((string)($_POST['supplier_name'] ?? ''));
+   $contact_name = trim((string)($_POST['contact_name'] ?? ''));
+   $phone_number = trim((string)($_POST['phone_number'] ?? ''));
+   $email = trim((string)($_POST['email'] ?? ''));
+   $address = trim((string)($_POST['address'] ?? ''));
+
+   if ($supplier_id <= 0 || $supplier_name === '') {
+      $_SESSION['supplier_error'] = 'Dữ liệu cập nhật nhà cung cấp không hợp lệ.';
+      header('location:user_page.php?nhacungcap');
+      exit;
+   }
+
+   $safe_name = mysqli_real_escape_string($conn, $supplier_name);
+   $safe_contact = mysqli_real_escape_string($conn, $contact_name);
+   $safe_phone = mysqli_real_escape_string($conn, $phone_number);
+   $safe_email = mysqli_real_escape_string($conn, $email);
+   $safe_address = mysqli_real_escape_string($conn, $address);
+
+   $update = "UPDATE suppliers
+              SET supplier_name = '{$safe_name}',
+                  contact_name = '{$safe_contact}',
+                  phone_number = '{$safe_phone}',
+                  email = '{$safe_email}',
+                  address = '{$safe_address}'
+              WHERE supplier_id = {$supplier_id}";
+
+   try {
+      mysqli_query($conn, $update);
+      $_SESSION['supplier_success'] = 'Cập nhật nhà cung cấp thành công.';
+   } catch (\Throwable $e) {
+      $_SESSION['supplier_error'] = 'Không thể cập nhật nhà cung cấp.';
+   }
+
+   header('location:user_page.php?nhacungcap');
+   exit;
+}
+
+if (isset($_POST['supplier_delete_submit'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+
+   $supplier_id = (int)($_POST['supplier_id'] ?? 0);
+   if ($supplier_id <= 0) {
+      $_SESSION['supplier_error'] = 'Nhà cung cấp không hợp lệ.';
+      header('location:user_page.php?nhacungcap');
+      exit;
+   }
+
+   $delete = "UPDATE suppliers SET status = 'inactive' WHERE supplier_id = {$supplier_id}";
+   mysqli_query($conn, $delete);
+   $_SESSION['supplier_success'] = 'Đã xóa (ẩn) nhà cung cấp thành công.';
+   header('location:user_page.php?nhacungcap');
+   exit;
+}
+
+if (isset($_GET['nhacungcap'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+   require_once __DIR__ . '/src/views/nhacungcap.php';
 }
 // Phần đơn hàng 
 if (isset($_GET['donhang'])) {
@@ -280,6 +393,170 @@ if (isset($_GET['thongke'])) {
          break;
    }
 }
+
+if (isset($_POST['warehouse_receipt_submit'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+
+   require_once __DIR__ . '/src/warehouse/Models.php';
+   require_once __DIR__ . '/src/warehouse/Repositories.php';
+   require_once __DIR__ . '/src/warehouse/Services.php';
+
+   $itemIds = $_POST['item_id'] ?? [];
+   $quantities = $_POST['quantity'] ?? [];
+   $importPrices = $_POST['import_price'] ?? [];
+   $unitPrices = $_POST['unit_price'] ?? [];
+   if (!is_array($itemIds)) {
+      $itemIds = [$itemIds];
+   }
+   if (!is_array($quantities)) {
+      $quantities = [$quantities];
+   }
+   if (!is_array($importPrices)) {
+      $importPrices = [$importPrices];
+   }
+   if (!is_array($unitPrices)) {
+      $unitPrices = [$unitPrices];
+   }
+
+   $items = [];
+   foreach ($itemIds as $idx => $rawItemId) {
+      $itemId = (int)$rawItemId;
+      $qty = (int)($quantities[$idx] ?? 0);
+      $importPrice = (float)($importPrices[$idx] ?? 0);
+      $unitPrice = (float)($unitPrices[$idx] ?? 0);
+      if ($itemId > 0 && $qty > 0 && $importPrice >= 0 && $unitPrice >= 0) {
+         $items[] = [
+            'item_id' => $itemId,
+            'quantity' => $qty,
+            'import_price' => $importPrice,
+            'unit_price' => $unitPrice
+         ];
+      }
+   }
+
+   $supplierId = (int)($_POST['supplier_id'] ?? 0);
+   $note = trim((string)($_POST['note'] ?? ''));
+   $importDate = (string)($_POST['import_date'] ?? date('Y-m-d'));
+
+   $receiptService = new \Warehouse\Services\GoodsReceiptService($conn);
+   $result = $receiptService->createReceipt([
+      'supplier_id' => $supplierId,
+      'import_date' => $importDate,
+      'note' => $note !== '' ? $note : null,
+      'items' => $items
+   ], currentUserId());
+
+   if ($result['success']) {
+      $_SESSION['warehouse_receipt_success'] = $result['message'] . ' - ' . ($result['receipt_code'] ?? '');
+   } else {
+      $_SESSION['warehouse_receipt_error'] = $result['error'] ?? ($result['message'] ?? 'Tạo phiếu nhập thất bại');
+   }
+
+   header('location:user_page.php?phieunhap');
+   exit;
+}
+
+if (isset($_POST['warehouse_receipt_update_submit'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+
+   require_once __DIR__ . '/src/warehouse/Models.php';
+   require_once __DIR__ . '/src/warehouse/Repositories.php';
+   require_once __DIR__ . '/src/warehouse/Services.php';
+
+   $receiptId = (int)($_POST['receipt_id'] ?? 0);
+   $itemIds = $_POST['item_id'] ?? [];
+   $quantities = $_POST['quantity'] ?? [];
+   $importPrices = $_POST['import_price'] ?? [];
+   $unitPrices = $_POST['unit_price'] ?? [];
+   if (!is_array($itemIds)) {
+      $itemIds = [$itemIds];
+   }
+   if (!is_array($quantities)) {
+      $quantities = [$quantities];
+   }
+   if (!is_array($importPrices)) {
+      $importPrices = [$importPrices];
+   }
+   if (!is_array($unitPrices)) {
+      $unitPrices = [$unitPrices];
+   }
+
+   $items = [];
+   foreach ($itemIds as $idx => $rawItemId) {
+      $itemId = (int)$rawItemId;
+      $qty = (int)($quantities[$idx] ?? 0);
+      $importPrice = (float)($importPrices[$idx] ?? 0);
+      $unitPrice = (float)($unitPrices[$idx] ?? 0);
+      if ($itemId > 0 && $qty > 0 && $importPrice >= 0 && $unitPrice >= 0) {
+         $items[] = [
+            'item_id' => $itemId,
+            'quantity' => $qty,
+            'import_price' => $importPrice,
+            'unit_price' => $unitPrice
+         ];
+      }
+   }
+
+   $supplierId = (int)($_POST['supplier_id'] ?? 0);
+   $note = trim((string)($_POST['note'] ?? ''));
+   $importDate = (string)($_POST['import_date'] ?? date('Y-m-d'));
+
+   $receiptService = new \Warehouse\Services\GoodsReceiptService($conn);
+   $result = $receiptService->updateReceipt($receiptId, [
+      'supplier_id' => $supplierId,
+      'import_date' => $importDate,
+      'note' => $note !== '' ? $note : null,
+      'items' => $items
+   ], currentUserId());
+
+   if ($result['success']) {
+      $_SESSION['warehouse_receipt_success'] = $result['message'];
+   } else {
+      $_SESSION['warehouse_receipt_error'] = $result['error'] ?? ($result['message'] ?? 'Cập nhật phiếu nhập thất bại');
+   }
+
+   header('location:user_page.php?phieunhap');
+   exit;
+}
+
+if (isset($_POST['warehouse_receipt_delete_submit'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+
+   require_once __DIR__ . '/src/warehouse/Models.php';
+   require_once __DIR__ . '/src/warehouse/Repositories.php';
+   require_once __DIR__ . '/src/warehouse/Services.php';
+
+   $receiptId = (int)($_POST['receipt_id'] ?? 0);
+   $receiptService = new \Warehouse\Services\GoodsReceiptService($conn);
+   $result = $receiptService->deleteReceipt($receiptId, currentUserId());
+
+   if ($result['success']) {
+      $_SESSION['warehouse_receipt_success'] = $result['message'];
+   } else {
+      $_SESSION['warehouse_receipt_error'] = $result['error'] ?? ($result['message'] ?? 'Xóa phiếu nhập thất bại');
+   }
+
+   header('location:user_page.php?phieunhap');
+   exit;
+}
+
+if (isset($_GET['phieunhap'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+   require_once __DIR__ . '/src/views/phieunhap.php';
+}
+
+if (isset($_GET['phieuxuat'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+   header('location:user_page.php?phieunhap');
+   exit;
+}
+
+if (isset($_GET['kho_thongke'])) {
+   requirePermission(AppPermission::MANAGE_CATALOG);
+   require_once __DIR__ . '/src/views/kho_thongke.php';
+}
+
+renderAppLayoutEnd();
 ?>
 
 

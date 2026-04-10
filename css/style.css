@@ -4,6 +4,14 @@ body {
   margin: 0;
   padding: 0;
   background-color: #d9e1cb;
+  overflow: hidden;
+}
+
+.app-shell {
+  height: 100vh;
+  width: 100%;
+  position: relative;
+  margin: 0;
 }
 
 a {
@@ -14,11 +22,125 @@ a {
   color: aliceblue;
   background-color: #0a1e1f;
   box-shadow: 10px 0px 10px 0px rgba(45, 33, 33, 0.2);
-  min-height: 100%;
+  width: 220px;
+  min-width: 220px;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 40;
+}
+
+.app-right {
+  margin-left: 220px;
+  width: calc(100% - 220px);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-topbar {
+  height: 80px;
+  min-height: 80px;
+  background: #d9e1cb;
+  border-bottom: 1px solid #c4ccb7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 !important;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.app-topbar h4 {
+  color: #223127;
+  font-weight: 400;
+  width: 100%;
+  margin: 0;
+}
+
+.main {
+  flex: 1 1 auto;
+  height: calc(100vh - 80px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@media (max-width: 1200px) {
+  .nav-side {
+    width: 200px;
+    min-width: 200px;
+  }
+
+  .app-right {
+    margin-left: 200px;
+    width: calc(100% - 200px);
+  }
+}
+
+@media (max-width: 992px) {
+  .nav-side {
+    width: 180px;
+    min-width: 180px;
+  }
+
+  .app-right {
+    margin-left: 180px;
+    width: calc(100% - 180px);
+  }
+
+  .navs a {
+    font-size: 14px;
+    padding: 8px 10px 8px 18px;
+  }
+
+  .app-topbar h4 {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav-side {
+    width: 160px;
+    min-width: 160px;
+  }
+
+  .app-right {
+    margin-left: 160px;
+    width: calc(100% - 160px);
+  }
+
+  .app-topbar {
+    height: 80px;
+    min-height: 80px;
+  }
+
+  .main {
+    height: calc(100vh - 80px);
+  }
+
+  .app-topbar h4 {
+    font-size: 18px;
+  }
 }
 
 .logo {
-  background-color: #899678;
+  background-color: #0a1e1f;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo img {
+  width: 68px;
+  max-width: 70%;
+  height: auto;
 }
 
 .navs a {
@@ -27,8 +149,8 @@ a {
   text-align: left;
   color: aliceblue;
   transition: background-color 0.3s ease-in-out;
-  padding: 8px 0px 8px 33px;
-  font-size: large;
+  padding: 9px 10px 9px 24px;
+  font-size: 15px;
 }
 
 .navs div {
@@ -87,6 +209,11 @@ a {
   font-weight: bolder;
 }
 
+.main .head-name,
+.main .head-line {
+  display: none !important;
+}
+
 /* .table {
     border-collapse: collapse;
 }
@@ -128,6 +255,90 @@ th {
   border: 1px solid #ddd;
   padding: 8px;
   text-align: left;
+}
+
+.product-table-scroll {
+  max-height: 520px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.product-table-scroll table thead th,
+.product-table-scroll table tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.content-table-scroll {
+  height: 420px;
+  max-height: 420px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.content-table-scroll table thead th,
+.content-table-scroll table tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.warehouse-home {
+  height: 100vh;
+  width: 100%;
+  background-image: url("../img/home.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.warehouse-home__overlay {
+  height: 100%;
+  width: 100%;
+  background: rgba(10, 16, 24, 0.28);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.warehouse-home__panel {
+  padding: 24px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.warehouse-home__actions {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.warehouse-home__btn {
+  min-width: 220px;
+  padding: 14px 20px;
+  text-align: center;
+  text-decoration: none;
+  color: #18352f;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(24, 53, 47, 0.2);
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.warehouse-home__btn:hover {
+  color: #102621;
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-1px);
 }
 
 /* Phần đăng nhập  */
