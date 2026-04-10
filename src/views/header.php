@@ -24,41 +24,52 @@
             <div class="container-fluid">
                 <a class="text-truncate" href="user_page.php?dashboard"><i class="fa-solid fa-house-chimney"></i> DashBoard</a>
             </div>
-            <div class="container-fluid">
-                <a class="text-truncate" href="user_page.php?loai"><i class="fa-solid fa-list"></i> Loại</a>
-            </div>
-            <div class="container-fluid">
-                <a class="text-truncate" href="user_page.php?sanpham"><i class="fa-solid fa-mug-hot"></i> Sản Phẩm</a>
-            </div>
-            <div class="container-fluid">
-                <a class="text-truncate" href="user_page.php?donhang"><i class="fa-solid fa-receipt"></i> Đơn hàng</a>
-            </div>
-            <div class="container-fluid">
-                <a class="text-truncate" href="user_page.php?khachhang"><i class="fa-solid fa-address-book"></i> Khách hàng</a>
-            </div>
+            <?php if (can(AppPermission::MANAGE_CATALOG)) : ?>
+                <div class="container-fluid">
+                    <a class="text-truncate" href="user_page.php?loai"><i class="fa-solid fa-list"></i> Loại</a>
+                </div>
+                <div class="container-fluid">
+                    <a class="text-truncate" href="user_page.php?sanpham"><i class="fa-solid fa-mug-hot"></i> Sản Phẩm</a>
+                </div>
+            <?php endif; ?>
+            <?php if (can(AppPermission::PROCESS_ORDERS)) : ?>
+                <div class="container-fluid">
+                    <a class="text-truncate" href="user_page.php?donhang"><i class="fa-solid fa-receipt"></i> Đơn hàng</a>
+                </div>
+            <?php endif; ?>
+            <?php if (can(AppPermission::MANAGE_CUSTOMERS)) : ?>
+                <div class="container-fluid">
+                    <a class="text-truncate" href="user_page.php?khachhang"><i class="fa-solid fa-address-book"></i> Khách hàng</a>
+                </div>
+            <?php endif; ?>
         </div>
 
 
-        <?php
-        if (isset($_SESSION['admin_id'])) :
-        ?>
+        <?php if (can(AppPermission::MANAGE_STAFF) || can(AppPermission::VIEW_REPORTS)) : ?>
             <hr>
             <div class="container-fluid admin-head">
-                <h5 class="text-center py-2 fw-bold">Quản Trị</h5>
+                <h5 class="text-center py-2 fw-bold">Quản Lý</h5>
             </div>
             <div class="navs text-center p-0">
-                <div class="container-fluid">
-                    <a class="text-truncate" href="user_page.php?nhansu"><i class="fa-solid fa-users"></i> Nhân sự</a>
-                </div>
-                <div class="container-fluid">
-                    <a class="text-truncate" href="user_page.php?thongke"><i class="fa-solid fa-coins"></i> Thống kê</a>
-                </div>
+                <?php if (can(AppPermission::MANAGE_STAFF)) : ?>
+                    <div class="container-fluid">
+                        <a class="text-truncate" href="user_page.php?nhansu"><i class="fa-solid fa-users"></i> Nhân sự</a>
+                    </div>
+                <?php endif; ?>
+                <?php if (can(AppPermission::VIEW_REPORTS)) : ?>
+                    <div class="container-fluid">
+                        <a class="text-truncate" href="user_page.php?thongke"><i class="fa-solid fa-coins"></i> Thống kê</a>
+                    </div>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
         <div class="navs text-center p-0">
             <hr class="mt-3">
             <div class="container-fluid">
                 <a class="text-truncate"><i class="fa-solid fa-user-check"></i> <?= $user_name ?? '' ?></a>
+            </div>
+            <div class="container-fluid">
+                <a class="text-truncate"><i class="fa-solid fa-id-badge"></i> <?= roleLabel(currentRole()) ?></a>
             </div>
             <div class="    container-fluid logout-btn">
                 <a class="text-truncate" href="logout.php"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a>

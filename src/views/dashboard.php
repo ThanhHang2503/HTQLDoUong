@@ -11,10 +11,12 @@ function dashboardScalar(mysqli $conn, string $sql, string $column)
 }
 
 $so_mon = dashboardScalar($conn, "SELECT COUNT(*) AS so_mon FROM items", "so_mon");
-$so_nhanvien = dashboardScalar($conn, "SELECT COUNT(*) AS so_nhanvien FROM accounts WHERE type = 'user'", "so_nhanvien");
+$so_quanly = dashboardScalar($conn, "SELECT COUNT(*) AS so_quanly FROM accounts a JOIN roles r ON r.id = a.role_id WHERE r.name = 'manager' AND a.status = 'active'", "so_quanly");
+$so_nv_banhang = dashboardScalar($conn, "SELECT COUNT(*) AS so_nv_banhang FROM accounts a JOIN roles r ON r.id = a.role_id WHERE r.name = 'sales' AND a.status = 'active'", "so_nv_banhang");
+$so_nv_kho = dashboardScalar($conn, "SELECT COUNT(*) AS so_nv_kho FROM accounts a JOIN roles r ON r.id = a.role_id WHERE r.name = 'warehouse' AND a.status = 'active'", "so_nv_kho");
 $so_khachhang = dashboardScalar($conn, "SELECT COUNT(*) AS so_khachhang FROM customers", "so_khachhang");
 $so_danhmuc = dashboardScalar($conn, "SELECT COUNT(*) AS so_danhmuc FROM category", "so_danhmuc");
-$so_admin = dashboardScalar($conn, "SELECT COUNT(*) AS so_admin FROM accounts WHERE type = 'admin'", "so_admin");
+$so_admin = dashboardScalar($conn, "SELECT COUNT(*) AS so_admin FROM accounts a JOIN roles r ON r.id = a.role_id WHERE r.name = 'admin' AND a.status = 'active'", "so_admin");
 $so_hoadon = dashboardScalar($conn, "SELECT COUNT(*) AS so_hoadon FROM invoices", "so_hoadon");
 $so_tien = dashboardScalar($conn, "SELECT COALESCE(SUM(total), 0) AS so_tien FROM invoices", "so_tien");
 
@@ -46,8 +48,8 @@ $so_tien = dashboardScalar($conn, "SELECT COALESCE(SUM(total), 0) AS so_tien FRO
                 <div class="px-3">
                     <div style="background-color: #019159;" class="box row justify-content-between">
                         <div class="col-6">
-                            <h1 class="fw-bolder"><?= $so_nhanvien ?></h1>
-                            <p class="fw-bolder text-start">Nhân viên</p>
+                            <h1 class="fw-bolder"><?= $so_nv_banhang ?></h1>
+                            <p class="fw-bolder text-start">NV bán hàng</p>
                         </div>
                         <div class="col-5 text-center">
                             <i class="big-icon fa-solid fa-users"></i>
@@ -95,8 +97,8 @@ $so_tien = dashboardScalar($conn, "SELECT COALESCE(SUM(total), 0) AS so_tien FRO
                 <div class="px-3">
                     <div style="background-color: #001e40" class="box row justify-content-between">
                         <div class="col-6">
-                            <h1 class="fw-bolder"><?= $so_admin ?></h1>
-                            <p class="fw-bolder text-start">Nhà quản lý</p>
+                            <h1 class="fw-bolder"><?= $so_quanly ?></h1>
+                            <p class="fw-bolder text-start">Quản lý</p>
                         </div>
                         <div class="col-5 text-center">
                             <i style="color: #b4aba9;" class="big-icon fa-solid fa-people-roof"></i>
@@ -110,11 +112,11 @@ $so_tien = dashboardScalar($conn, "SELECT COALESCE(SUM(total), 0) AS so_tien FRO
                 <div class="px-3">
                     <div style="background-color: #27aebb;" class="box row justify-content-between">
                         <div class="col-6">
-                            <h1 class="fw-bolder"><?= $so_hoadon ?></h1>
-                            <p class="fw-bolder text-start">Hóa đơn</p>
+                            <h1 class="fw-bolder"><?= $so_nv_kho ?></h1>
+                            <p class="fw-bolder text-start">NV kho</p>
                         </div>
                         <div class="col-5 text-center">
-                            <i class="big-icon fa-solid fa-file-invoice-dollar"></i>
+                            <i class="big-icon fa-solid fa-boxes-stacked"></i>
                         </div>
                         <div class="foot-box col-12 text-center"><i class="small-icon text-white fa-solid fa-eye"></i></div>
                     </div>
@@ -122,6 +124,21 @@ $so_tien = dashboardScalar($conn, "SELECT COALESCE(SUM(total), 0) AS so_tien FRO
                 </div>
             </div>
             <div class="col-6">
+                <div class="px-3">
+                    <div style="background-color: #e83260;" class="box row justify-content-between">
+                        <div class="col-7">
+                            <h1 class="fw-bolder"><?= $so_admin ?></h1>
+                            <p class="fw-bolder text-start">Admin</p>
+                        </div>
+                        <div class="col-5 text-center">
+                            <i class="big-icon fa-solid fa-user-shield"></i>
+                        </div>
+                        <div class=" foot-box col-12 text-center"><i class="small-icon text-white fa-solid fa-eye"></i></div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="col-12 mt-3">
                 <div class="px-3">
                     <div style="background-color: #e83260;" class="box row justify-content-between">
                         <div class="col-7">

@@ -10,7 +10,7 @@ $ds_loai = mysqli_fetch_all($ds_loai);
     <div class="head-line"></div>
     <div class="container-fluid">
         <!-- là admin thì được sửa  -->
-        <?php if (isset($_SESSION['admin_id'])) : ?>
+        <?php if (can(AppPermission::MANAGE_CATALOG)) : ?>
             <div class="text-end">
 
                 <a href="user_page.php?loai=them" class="my-2 btn btn-success fw-bolder"><i class="fa-solid fa-file-circle-plus"></i> Thêm</a>
@@ -22,7 +22,7 @@ $ds_loai = mysqli_fetch_all($ds_loai);
                 <th >Mã loại</th>
                 <th onclick="sortTable(1)">Tên<i href="" class=" fw-bolder"><i class="p-0 btn fa-solid fa-sort"></i></i></th>
                 <?php
-                if (isset($_SESSION['admin_id']))
+                if (can(AppPermission::MANAGE_CATALOG))
                     echo "<th>Thao tác</th>";
                 ?>
             </tr>
@@ -31,7 +31,7 @@ $ds_loai = mysqli_fetch_all($ds_loai);
                     <td><?= $lo[0] ?></td>
                     <td><?= $lo[1] ?></td>
                     <?php
-                    if (isset($_SESSION['admin_id']))
+                    if (can(AppPermission::MANAGE_CATALOG))
                         echo '<td><a href="user_page.php?loai=sua&id=' . $lo[0] . '"><i class="btn btn-outline-success fa-solid fa-pen"></i> </a>
                         <a href="user_page.php?loai=xoa&id=' . $lo[0] . '"><i class="btn btn-outline-danger fa-solid fa-trash"></i></a></td>';
 

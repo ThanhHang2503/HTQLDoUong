@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/authorization.php';
+
 function redirect($link)
 {
 ?>
@@ -9,18 +11,12 @@ function redirect($link)
 }
 function checkUser()
 {
-	if (isset($_SESSION['user_id']) && $_SESSION['user_id'] != '') {
-	} else {
-		redirect('./index.php');
-	}
+	requireLogin();
 }
 
 function checkAdmin()
 {
-	if (isset($_SESSION['admin_id']) && $_SESSION['admin_id'] != '') {
-	} else {
-		redirect('./index.php');
-	}
+	requirePermission(AppPermission::MANAGE_STAFF);
 }
 
 function checkValidItemID($id)

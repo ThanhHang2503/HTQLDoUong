@@ -119,7 +119,7 @@ if (isset($_GET['donhang']) && $_GET['donhang'] == 'them') :
 
 
                 <form id="last-bill-form" action="user_page.php?donhang=luu" method="POST" class="d-none">
-                    <input name="account_id" type="hidden" value="<?= $_SESSION['user_id'] ?? $_SESSION['admin_id'] ?>">
+                    <input name="account_id" type="hidden" value="<?= currentUserId() ?>">
                     <input name="customer_name" type="hidden">
                     <input name="phone_number" type="hidden">
                     <input type="hidden" name="product_details[]">

@@ -75,6 +75,13 @@ Mở trình duyệt và truy cập:
 ```
 http://localhost/HTQLDoUong
 ```
+
+Giao diện admin riêng nằm tại:
+
+```
+http://localhost/HTQLDoUong/admin/
+```
+
 ## ⭐ Ghi chú
 
 Đây là project học tập, có thể còn thiếu sót. Mọi đóng góp đều được hoan nghênh!

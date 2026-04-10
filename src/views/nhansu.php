@@ -3,9 +3,12 @@
 @include('src/models/functions.php');
 checkAdmin();
 
-$sql = "select * from accounts";
+$sql = "SELECT a.account_id, a.full_name, a.email, r.name AS role_name, a.status
+    FROM accounts a
+    JOIN roles r ON r.id = a.role_id
+    ORDER BY a.account_id ASC";
 $ds_taikhoan =  mysqli_query($conn, $sql);
-$ds_taikhoan = mysqli_fetch_all($ds_taikhoan);
+$ds_taikhoan = mysqli_fetch_all($ds_taikhoan, MYSQLI_ASSOC);
 
 $statusMessage = '';
 if (isset($_GET['status'])) {
@@ -33,7 +36,7 @@ if (isset($_GET['status'])) {
     <div class="head-line"></div>
     <div class="container-fluid">
         <?= $statusMessage ?>
-        <?php if (isset($_SESSION['admin_id'])) : ?>
+        <?php if (can(AppPermission::MANAGE_STAFF)) : ?>
             <div class="text-end">
 
                 <a href="user_page.php?nhansu=them" class="my-2 btn btn-success fw-bolder"><i class="fa-solid fa-file-circle-plus"></i> Thêm users</a>
@@ -47,32 +50,34 @@ if (isset($_GET['status'])) {
                 <th onclick="sortTable(1)">Tên <i href="" class=" fw-bolder"><i class="p-0 btn fa-solid fa-sort"></i></th>
                 <th onclick="sortTable(2)">email <i href="" class=" fw-bolder"><i class="p-0 btn fa-solid fa-sort"></i></th>
                 <?php
-                if (isset($_SESSION['admin_id']))
+                if (can(AppPermission::MANAGE_STAFF))
                     echo "<th>Thao tác</th>";
                 ?>
                 <th>Quyền</th>
+                <th>Trạng thái</th>
             </tr>
             <?php foreach ($ds_taikhoan as $tk) : ?>
                 <tr>
-                    <td><?= $tk[0] ?></td>
-                    <td><?= $tk[1] ?></td>
-                    <td><?= $tk[2] ?></td>
+                    <td><?= $tk['account_id'] ?></td>
+                    <td><?= $tk['full_name'] ?></td>
+                    <td><?= $tk['email'] ?></td>
                     <?php
-                    $isInactive = isset($tk[4]) && $tk[4] === 'inactive';
-                    if (isset($_SESSION['admin_id']) && !$isInactive) {
-                        echo '<td><a href="user_page.php?nhansu=sua&id=' . $tk[0] . '"><i class="btn btn-outline-success fa-solid fa-pen"></i> </a>
-                        <a href="user_page.php?nhansu=xoa&id=' . $tk[0] . '" onclick="return confirm(\'Bạn chắc chắn muốn xóa nhân sự này?\')"><i class="btn btn-outline-danger fa-solid fa-trash"></i></a></td>';
-                    } elseif (isset($_SESSION['admin_id']) && $isInactive) {
+                    $isInactive = isset($tk['status']) && $tk['status'] === 'inactive';
+                    if (can(AppPermission::MANAGE_STAFF) && !$isInactive) {
+                        echo '<td><a href="user_page.php?nhansu=sua&id=' . $tk['account_id'] . '"><i class="btn btn-outline-success fa-solid fa-pen"></i> </a>
+                        <a href="user_page.php?nhansu=xoa&id=' . $tk['account_id'] . '" onclick="return confirm(\'Bạn chắc chắn muốn xóa nhân sự này?\')"><i class="btn btn-outline-danger fa-solid fa-trash"></i></a></td>';
+                    } elseif (can(AppPermission::MANAGE_STAFF) && $isInactive) {
                         echo '<td>
                         <span class="badge text-bg-secondary">Đã ngừng hoạt động</span>
-                        <a class="btn btn-outline-primary ms-2" href="user_page.php?nhansu=khoiphuc&id=' . $tk[0] . '" onclick="return confirm(\'Bạn muốn kích hoạt lại tài khoản này?\')">
+                        <a class="btn btn-outline-primary ms-2" href="user_page.php?nhansu=khoiphuc&id=' . $tk['account_id'] . '" onclick="return confirm(\'Bạn muốn kích hoạt lại tài khoản này?\')">
                             <i class="fa-solid fa-rotate-left"></i>
                         </a>
                         </td>';
                     } else
 
                     ?>
-                    <td><?= $tk[4] ?></td>
+                    <td><?= roleLabel($tk['role_name']) ?></td>
+                    <td><?= $isInactive ? 'Ngừng hoạt động' : 'Hoạt động' ?></td>
                 </tr>
             <?php endforeach; ?>
         </table>

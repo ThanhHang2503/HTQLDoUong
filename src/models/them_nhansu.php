@@ -1,5 +1,7 @@
 <?php
 if (isset($_GET['nhansu']) && $_GET['nhansu'] == 'them') :
+    $rolesResult = mysqli_query($conn, "SELECT id, name FROM roles ORDER BY id ASC");
+    $roles = $rolesResult ? mysqli_fetch_all($rolesResult, MYSQLI_ASSOC) : [];
 ?>
 
     <div class="px-5 mt-5">
@@ -24,12 +26,20 @@ if (isset($_GET['nhansu']) && $_GET['nhansu'] == 'them') :
                                 <input required type="text" class="form-control" id="password" name="password" required>
                             </div>
                             <div class="form-group  pt-3">
-                                <label for="category_id">Quyền</label>
-                                <select class="form-control" id="type" name="type">
-                                    <option value="user">user</option>
-                                    <option value="admin">admin</option>            
+                                <label for="role_id">Quyền</label>
+                                <select class="form-control" id="role_id" name="role_id">
+                                    <?php foreach ($roles as $role) : ?>
+                                        <option value="<?= $role['id'] ?>"><?= roleLabel($role['name']) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
-                            </div>                                               
+                            </div>
+                            <div class="form-group  pt-3">
+                                <label for="status">Trạng thái</label>
+                                <select class="form-control" id="status" name="status">
+                                    <option value="active">Hoạt động</option>
+                                    <option value="inactive">Ngừng hoạt động</option>
+                                </select>
+                            </div>
                             <button type="submit" class="mt-4 btn btn-success">Thêm users</button>
                         </form>
                     </div>

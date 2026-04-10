@@ -9,7 +9,7 @@ if (isset($_GET['nhansu']) && $_GET['nhansu'] == 'khoiphuc') {
     }
 
     try {
-        $sql = "UPDATE accounts SET type = 'user' WHERE account_id = $id AND type = 'inactive'";
+        $sql = "UPDATE accounts SET status = 'active' WHERE account_id = $id AND status = 'inactive'";
         $result = mysqli_query($conn, $sql);
 
         if ($result && mysqli_affected_rows($conn) > 0) {
@@ -27,7 +27,7 @@ if (isset($_GET['nhansu']) && $_GET['nhansu'] == 'khoiphuc') {
 
 if (isset($_GET['nhansu']) && $_GET['nhansu'] == 'xoa') {
     $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
-    $currentAdminId = isset($_SESSION['admin_id']) ? (int) $_SESSION['admin_id'] : 0;
+    $currentAdminId = currentUserId();
 
     if ($id <= 0) {
         header('location:user_page.php?nhansu&status=invalid_id');
@@ -47,7 +47,7 @@ if (isset($_GET['nhansu']) && $_GET['nhansu'] == 'xoa') {
         if ((int) ($checkRow['total'] ?? 0) > 0) {
             $archivedPassword = md5(uniqid((string) $id, true));
             $archiveSql = "UPDATE accounts 
-                SET type = 'inactive', 
+                SET status = 'inactive', 
                     password = '$archivedPassword'
                 WHERE account_id = $id";
             $archiveResult = mysqli_query($conn, $archiveSql);
