@@ -65,6 +65,18 @@ $activeSuppliers = adminCountValue($conn, "SELECT COUNT(*) FROM suppliers WHERE 
                 <a class="<?= $view === 'suppliers' ? 'active' : '' ?>" href="?view=suppliers">
                     <i class="fa-solid fa-truck-fast"></i> Nhà cung cấp
                 </a>
+                <a href="../user_page.php?nhansu">
+                    <i class="fa-solid fa-users-gear"></i> Quản lý User
+                </a>
+                <a href="../user_page.php?baocao_kinhdoanh">
+                    <i class="fa-solid fa-chart-line"></i> BC Kinh doanh
+                </a>
+                <a href="../user_page.php?luong_ca_nhan">
+                    <i class="fa-solid fa-wallet"></i> Lương của tôi
+                </a>
+                <a href="../user_page.php?profile">
+                    <i class="fa-solid fa-user-pen"></i> Hồ sơ cá nhân
+                </a>
                 <a href="../logout.php">
                     <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
                 </a>

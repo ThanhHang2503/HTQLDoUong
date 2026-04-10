@@ -26,11 +26,7 @@ function getRolePermissions(): array
         AppRole::ADMIN => [
             AppPermission::VIEW_DASHBOARD,
             AppPermission::MANAGE_CATALOG,
-            AppPermission::MANAGE_WAREHOUSE,
-            AppPermission::PROCESS_ORDERS,
-            AppPermission::MANAGE_CUSTOMERS,
             AppPermission::VIEW_REPORTS,
-            AppPermission::MANAGE_STAFF,
             AppPermission::MANAGE_ACCOUNTS,
         ],
         AppRole::MANAGER => [
@@ -100,7 +96,11 @@ function can(string $permission): bool
 function requireLogin(): void
 {
     if (!isLoggedIn()) {
-        header('location:login_form.php');
+        if (headers_sent()) {
+            echo '<script>window.location.href="login_form.php";</script>';
+        } else {
+            header('location:login_form.php');
+        }
         exit;
     }
 }
@@ -109,7 +109,11 @@ function requirePermission(string $permission): void
 {
     requireLogin();
     if (!can($permission)) {
-        header('location:user_page.php?home&error=forbidden');
+        if (headers_sent()) {
+            echo '<script>window.location.href="user_page.php?home&error=forbidden";</script>';
+        } else {
+            header('location:user_page.php?home&error=forbidden');
+        }
         exit;
     }
 }

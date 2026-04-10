@@ -9,19 +9,12 @@ requireLogin();
 // Admin được vào admin panel. Manager/Sales/Warehouse vào user_page
 $current_role = currentRole();
 if ($current_role === AppRole::ADMIN) {
-   // Admin có thể dùng ?admin_panel để vào admin page, nhưng cũng có thể dùng user_page
-   if (!isset($_GET['profile']) && !isset($_GET['chucvu']) && !isset($_GET['bangluong'])
-       && !isset($_GET['donnghi']) && !isset($_GET['donnghiviec']) && !isset($_GET['baocao_nhansu'])
-       && !isset($_GET['baocao_kinhdoanh']) && !isset($_GET['baocao_kho']) && !isset($_GET['backup'])
-       && !isset($_GET['nhansu']) && !isset($_GET['luong_ca_nhan'])) {
-       if (!isset($_GET['home']) && !isset($_GET['sanpham']) && !isset($_GET['phieunhap'])
-           && !isset($_GET['phieuxuat']) && !isset($_GET['kho_thongke']) && !isset($_GET['nhacungcap'])
-           && !isset($_GET['loai']) && !isset($_GET['donhang']) && !isset($_GET['khachhang'])
-           && !isset($_GET['thongke']) && !isset($_GET['timkiem-donhang']) && !isset($_GET['timkiem-khachhang'])
-           && !isset($_GET['timkiem-sanpham']) && !isset($_GET['chucvu_history_api'])) {
+   if (!isset($_GET['profile']) && !isset($_GET['nhansu']) && !isset($_GET['thongke'])
+       && !isset($_GET['baocao_kinhdoanh']) && !isset($_GET['baocao_kho']) 
+       && !isset($_GET['baocao_nhansu']) && !isset($_GET['luong_ca_nhan'])
+       && !isset($_GET['dashboard'])) {
           header('location:admin/index.php');
           exit;
-       }
    }
 }
 
@@ -575,7 +568,9 @@ if (isset($_GET['donnghiviec'])) {
 
 // Báo cáo kho
 if (isset($_GET['baocao_kho'])) {
-   requirePermission(AppPermission::MANAGE_WAREHOUSE);
+   if (!can(AppPermission::MANAGE_WAREHOUSE) && !can(AppPermission::VIEW_REPORTS)) {
+      requirePermission(AppPermission::MANAGE_WAREHOUSE); // giữ redirect chuẩn forbidden
+   }
    require_once __DIR__ . '/src/views/baocao_kho.php';
 }
 
@@ -587,21 +582,13 @@ if (isset($_GET['baocao_kinhdoanh'])) {
 
 // Báo cáo nhân sự
 if (isset($_GET['baocao_nhansu'])) {
-   requirePermission(AppPermission::MANAGE_STAFF);
+   if (!can(AppPermission::MANAGE_STAFF) && !can(AppPermission::VIEW_REPORTS)) {
+       requirePermission(AppPermission::MANAGE_STAFF); // will trigger standard forbidden redirect
+   }
    require_once __DIR__ . '/src/views/baocao_nhansu.php';
 }
 
-// Sao lưu & Phục hồi
-if (isset($_GET['backup'])) {
-   requirePermission(AppPermission::MANAGE_CATALOG);
-   require_once __DIR__ . '/src/views/backup.php';
-}
+// (Đã xóa tính năng backup)
 
 renderAppLayoutEnd();
 ?>
-
-
-
-<?php
-require_once __DIR__ . '/src/views/footer.php';
-?> 

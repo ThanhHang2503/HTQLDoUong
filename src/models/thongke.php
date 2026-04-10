@@ -64,17 +64,10 @@ try {
 							 JOIN customers c ON i.customer_id = c.customer_id
 							 WHERE i.creation_time >= ? AND i.creation_time < ?
 							 GROUP BY c.customer_id, c.customer_name
-							 HAVING COUNT(*) = (
-								SELECT MAX(t.cnt)
-								FROM (
-									SELECT COUNT(*) AS cnt
-									FROM invoices i2
-									WHERE i2.creation_time >= ? AND i2.creation_time < ?
-									GROUP BY i2.customer_id
-								) t
-							 )";
+							 ORDER BY invoice_count DESC
+							 LIMIT 3";
 			$stmt3 = $conn->prepare($customer_sql);
-			$stmt3->bind_param('ssss', $start_date, $end_date, $start_date, $end_date);
+			$stmt3->bind_param('ss', $start_date, $end_date);
 			$stmt3->execute();
 			$customer_sales_rows = $stmt3->get_result();
 			if ($customer_sales_rows->num_rows <= 0) {

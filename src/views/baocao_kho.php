@@ -1,6 +1,8 @@
 <?php
 // Báo cáo kho - nhập xuất tồn theo tháng/quý/năm
-requirePermission(AppPermission::MANAGE_WAREHOUSE);
+if (!can(AppPermission::MANAGE_WAREHOUSE) && !can(AppPermission::VIEW_REPORTS)) {
+    requirePermission(AppPermission::MANAGE_WAREHOUSE); // giữ redirect chuẩn forbidden
+}
 global $conn;
 
 $sel_year    = (int)($_GET['year']    ?? date('Y'));
@@ -26,6 +28,14 @@ $import_sql = "SELECT COUNT(DISTINCT ir.receipt_id) AS total_receipts, SUM(ir.to
 $imp_r = mysqli_query($conn, $import_sql);
 $imp_summary = $imp_r ? mysqli_fetch_assoc($imp_r) : [];
 
+// Tổng số lượng nhập trong kỳ lọc
+$import_qty_sql = "SELECT SUM(ri.quantity) AS total_import_qty
+                   FROM inventory_receipt_items ri
+                   JOIN inventory_receipts ir ON ir.receipt_id = ri.receipt_id
+                   $where_receipt AND ir.status='completed'";
+$imp_qty_r = mysqli_query($conn, $import_qty_sql);
+$imp_qty_summary = $imp_qty_r ? mysqli_fetch_assoc($imp_qty_r) : [];
+
 // Tổng xuất kho
 $export_sql = "SELECT COUNT(DISTINCT ie.export_id) AS total_exports, SUM(ie.total_value) AS total_export_value
                FROM inventory_exports ie $where_export";
@@ -47,6 +57,36 @@ $import_monthly = "SELECT MONTH(ir.import_date) AS thang, COUNT(*) AS so_phieu, 
                    GROUP BY MONTH(ir.import_date) ORDER BY thang";
 $imp_month_r = mysqli_query($conn, $import_monthly);
 $import_months = $imp_month_r ? mysqli_fetch_all($imp_month_r, MYSQLI_ASSOC) : [];
+
+$import_value_by_month = [];
+foreach ($import_months as $row) {
+    $monthNumber = (int)($row['thang'] ?? 0);
+    if ($monthNumber > 0) {
+        $import_value_by_month[$monthNumber] = (float)($row['tong_gia_tri'] ?? 0);
+    }
+}
+
+// Tổng số lượng nhập theo tháng trong năm được chọn
+$import_qty_monthly = "SELECT MONTH(ir.import_date) AS thang, SUM(ri.quantity) AS tong_so_luong
+                       FROM inventory_receipt_items ri
+                       JOIN inventory_receipts ir ON ir.receipt_id = ri.receipt_id
+                       WHERE ir.status='completed' AND YEAR(ir.import_date)=$sel_year
+                       GROUP BY MONTH(ir.import_date)
+                       ORDER BY thang";
+$imp_qty_month_r = mysqli_query($conn, $import_qty_monthly);
+$import_qty_months = $imp_qty_month_r ? mysqli_fetch_all($imp_qty_month_r, MYSQLI_ASSOC) : [];
+
+// Tổng số lượng nhập theo năm (toàn bộ dữ liệu)
+$import_qty_yearly = "SELECT YEAR(ir.import_date) AS nam,
+                             SUM(ri.quantity) AS tong_so_luong,
+                             SUM(ri.line_total) AS tong_tien_nhap
+                      FROM inventory_receipt_items ri
+                      JOIN inventory_receipts ir ON ir.receipt_id = ri.receipt_id
+                      WHERE ir.status='completed'
+                      GROUP BY YEAR(ir.import_date)
+                      ORDER BY nam DESC";
+$imp_qty_year_r = mysqli_query($conn, $import_qty_yearly);
+$import_qty_years = $imp_qty_year_r ? mysqli_fetch_all($imp_qty_year_r, MYSQLI_ASSOC) : [];
 
 // Xuất kho theo tháng
 $export_monthly = "SELECT MONTH(ie.export_date) AS thang, COUNT(*) AS so_phieu, SUM(ie.total_value) AS tong_gia_tri
@@ -73,6 +113,13 @@ $stock_detail = "SELECT i.item_name, c.category_name, i.stock_quantity, i.purcha
   ORDER BY i.stock_quantity ASC";
 $sd_r = mysqli_query($conn, $stock_detail);
 $stock_details = $sd_r ? mysqli_fetch_all($sd_r, MYSQLI_ASSOC) : [];
+
+$low_stock_items = [];
+foreach ($stock_details as $sd) {
+    if ((int)($sd['stock_quantity'] ?? 0) < 10) {
+        $low_stock_items[] = $sd;
+    }
+}
 
 // Chart data
 $imp_chart = array_fill(1, 12, 0);
@@ -136,10 +183,68 @@ foreach ($export_months as $em) $exp_chart[(int)$em['thang']] = (float)$em['tong
             <small>Tổng tồn (<?= number_format($stock_summary['total_products']??0) ?> loại SP)</small></div></div></div>
     </div>
 
+    <div class="row g-3 mb-3">
+        <div class="col-md-6"><div class="card border-secondary text-center shadow-sm">
+            <div class="card-body"><div class="text-secondary mb-1"><i class="fa-solid fa-layer-group fa-2x"></i></div>
+            <div class="fs-5 fw-bold"><?= number_format($imp_qty_summary['total_import_qty'] ?? 0) ?></div>
+            <small>Tổng số lượng nhập trong kỳ lọc</small></div></div></div>
+        <div class="col-md-6"><div class="card border-danger text-center shadow-sm">
+            <div class="card-body"><div class="text-danger mb-1"><i class="fa-solid fa-fire-flame-curved fa-2x"></i></div>
+            <div class="fs-5 fw-bold"><?= count($low_stock_items) ?></div>
+            <small>Cảnh báo tồn kho thấp (&lt; 10)</small></div></div></div>
+    </div>
+
     <!-- Biểu đồ nhập/xuất theo tháng -->
     <div class="card shadow-sm mb-3">
         <div class="card-header fw-bold"><i class="fa-solid fa-chart-bar me-2"></i>Giá Trị Nhập Xuất Kho Theo Tháng (<?= $sel_year ?>)</div>
         <div class="card-body"><canvas id="stockChart" height="80"></canvas></div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header fw-bold"><i class="fa-solid fa-calendar-days me-2"></i>Nhập Kho Theo Thời Gian (Theo Tháng - <?= $sel_year ?>)</div>
+                <div class="card-body p-0" style="max-height:260px;overflow-y:auto">
+                    <table class="table table-sm table-striped table-bordered mb-0 text-center">
+                        <thead class="table-dark sticky-top"><tr><th>Tháng</th><th>Tổng SL nhập</th><th>Tổng tiền nhập</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($import_qty_months as $im): ?>
+                            <tr>
+                                <td><?= (int)$im['thang'] ?></td>
+                                <td class="fw-bold"><?= number_format($im['tong_so_luong'] ?? 0) ?></td>
+                                <td class="text-primary"><?= number_format($import_value_by_month[(int)$im['thang']] ?? 0,0,',','.') ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($import_qty_months)): ?>
+                            <tr><td colspan="3" class="text-muted">Không có dữ liệu nhập theo tháng</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header fw-bold"><i class="fa-solid fa-calendar-week me-2"></i>Tổng Nhập Theo Năm</div>
+                <div class="card-body p-0" style="max-height:260px;overflow-y:auto">
+                    <table class="table table-sm table-striped table-bordered mb-0 text-center">
+                        <thead class="table-dark sticky-top"><tr><th>Năm</th><th>Tổng SL nhập</th><th>Tổng tiền nhập</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($import_qty_years as $iy): ?>
+                            <tr>
+                                <td><?= (int)$iy['nam'] ?></td>
+                                <td class="fw-bold"><?= number_format($iy['tong_so_luong'] ?? 0) ?></td>
+                                <td class="text-success"><?= number_format($iy['tong_tien_nhap'] ?? 0,0,',','.') ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($import_qty_years)): ?>
+                            <tr><td colspan="3" class="text-muted">Không có dữ liệu nhập theo năm</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row g-3">
@@ -161,6 +266,30 @@ foreach ($export_months as $em) $exp_chart[(int)$em['thang']] = (float)$em['tong
                             <?php endforeach; ?>
                             <?php if (empty($top_import_items)): ?>
                             <tr><td colspan="4" class="text-muted">Không có dữ liệu</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cảnh báo tồn kho thấp -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold text-danger"><i class="fa-solid fa-fire me-2"></i>Cảnh Báo Tồn Kho Thấp (&lt; 10)</div>
+                <div class="card-body p-0" style="max-height:350px;overflow-y:auto">
+                    <table class="table table-sm table-striped table-bordered mb-0 text-center">
+                        <thead class="table-dark sticky-top"><tr><th>Sản phẩm</th><th>Danh mục</th><th>SL tồn</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($low_stock_items as $lsi): ?>
+                            <tr class="table-danger">
+                                <td class="text-start fw-bold"><?= htmlspecialchars($lsi['item_name']) ?></td>
+                                <td><?= htmlspecialchars($lsi['category_name'] ?? '') ?></td>
+                                <td class="fw-bold"><?= (int)$lsi['stock_quantity'] ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($low_stock_items)): ?>
+                            <tr><td colspan="3" class="text-muted">Không có sản phẩm tồn thấp</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
