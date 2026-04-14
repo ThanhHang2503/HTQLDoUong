@@ -82,6 +82,19 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
     $startTs = strtotime($startOfMonth);
     $endTs = strtotime($endOfMonth);
 
+    // Lấy hire_date để kiểm tra xem có phải nhân viên mới vào làm giữa tháng không
+    $acc_res = mysqli_query($conn, "SELECT hire_date FROM accounts WHERE account_id = $accountId");
+    $acc_row = mysqli_fetch_assoc($acc_res);
+    $hireTs = !empty($acc_row['hire_date']) ? strtotime($acc_row['hire_date']) : $startTs;
+
+    // Ngày bắt đầu tính lương thực tế trong tháng này (Max của Đầu tháng và Ngày vào làm)
+    $calcStartTs = max($startTs, $hireTs);
+    
+    // Nếu ngày vào làm sau tháng đang xét => lương 0
+    if ($calcStartTs > $endTs) return ['total' => 0, 'is_prorated' => false];
+
+    $isMidMonthHire = ($hireTs > $startTs && $hireTs <= $endTs);
+
     // Lấy lịch sử chức vụ ảnh hưởng đến tháng này
     $sql = "SELECT eph.start_date, eph.end_date, p.base_salary
             FROM employee_positions_history eph
@@ -94,13 +107,19 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
     $history = $res ? mysqli_fetch_all($res, MYSQLI_ASSOC) : [];
 
     if (empty($history)) {
-        // Fallback: Lấy lương hiện tại
+        // Fallback: Lấy lương hiện tại và pro-rate theo ngày vào làm
         $sql = "SELECT p.base_salary FROM accounts a 
                 JOIN positions p ON p.position_id = a.position_id 
                 WHERE a.account_id = $accountId";
         $cp_res = mysqli_query($conn, $sql);
         $cp = mysqli_fetch_assoc($cp_res);
-        return ['total' => (int)($cp['base_salary'] ?? 0), 'is_prorated' => false];
+        $base = (int)($cp['base_salary'] ?? 0);
+        
+        $days = floor(($endTs - $calcStartTs) / 86400) + 1;
+        return [
+            'total' => round(($days * $base) / 30), 
+            'is_prorated' => $isMidMonthHire
+        ];
     }
 
     $totalBaseSalary = 0;
@@ -108,19 +127,19 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
         $hStart = strtotime($h['start_date']);
         $hEnd = $h['end_date'] ? strtotime($h['end_date']) : strtotime('2099-12-31');
 
-        $overlapStart = max($hStart, $startTs);
+        // Overlap giữa (Chức vụ) và (Tháng này && Sau ngày vào làm)
+        $overlapStart = max($hStart, $calcStartTs);
         $overlapEnd = min($hEnd, $endTs);
 
         if ($overlapStart <= $overlapEnd) {
             $days = floor(($overlapEnd - $overlapStart) / 86400) + 1;
-            // Công thức: (Ngày / 30) * Lương
             $totalBaseSalary += ($days * (int)$h['base_salary']) / 30;
         }
     }
 
     return [
         'total' => round($totalBaseSalary), 
-        'is_prorated' => count($history) > 1
+        'is_prorated' => (count($history) > 1 || $isMidMonthHire)
     ];
 }
 
@@ -160,7 +179,7 @@ $emp_sql = "SELECT a.account_id, a.full_name, r.display_name AS role_name,
             FROM accounts a
             JOIN roles r ON r.id = a.role_id
             LEFT JOIN positions p ON p.position_id = a.position_id
-            WHERE a.hr_status = 'active' AND a.role_id != 1 AND a.position_id != 4
+            WHERE a.hr_status = 'active' AND a.role_id != 1
             ORDER BY a.full_name";
 $emp_result = mysqli_query($conn, $emp_sql);
 $employees = [];
@@ -337,8 +356,16 @@ if (isset($_GET['print'])) {
                     <form method="POST" action="" id="salaryForm">
                         <input type="hidden" name="salary_month" value="<?= $sel_month ?>">
                         <input type="hidden" name="salary_year" value="<?= $sel_year ?>">
-                        <div class="mb-2">
+                        <div class="mb-3">
                             <label class="form-label fw-bold">Nhân viên</label>
+                            
+                            <!-- Search Box -->
+                            <div class="input-group input-group-sm mb-2 shadow-sm">
+                                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-search text-muted"></i></span>
+                                <input type="text" class="form-control border-start-0 ps-0" id="empSearch" placeholder="Tìm tên nhân viên..." onkeyup="filterEmployees()">
+                                <button class="btn btn-outline-secondary" type="button" onclick="clearEmpSearch()"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+
                             <select class="form-select" name="account_id" id="empSelect" required onchange="fillBaseSalary(this)">
                                 <option value="">-- Chọn nhân viên --</option>
                                 <?php foreach ($employees as $emp): ?>
@@ -478,6 +505,28 @@ if (isset($_GET['print'])) {
 </div>
 
 <script>
+function filterEmployees() {
+    const input = document.getElementById('empSearch');
+    const filter = input.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const select = document.getElementById('empSelect');
+    const options = select.getElementsByTagName('option');
+
+    for (let i = 1; i < options.length; i++) {
+        let txtValue = options[i].textContent || options[i].innerText;
+        let normalizedValue = txtValue.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (normalizedValue.indexOf(filter) > -1) {
+            options[i].style.display = "";
+        } else {
+            options[i].style.display = "none";
+        }
+    }
+}
+
+function clearEmpSearch() {
+    document.getElementById('empSearch').value = '';
+    filterEmployees();
+}
+
 function fillBaseSalary(sel) {
     const option = sel.options[sel.selectedIndex];
     if (!option.value) {

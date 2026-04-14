@@ -85,15 +85,17 @@ if ($isManagerOrAdmin) {
         </div>
 
         <div class="navs pt-3">
+            <?php if (!$isManagerRole) : ?>
             <div class="container-fluid">
                 <a class="text-truncate <?= isset($_GET['home'])||isset($_GET['dashboard']) ? 'active' : '' ?>"
                    href="user_page.php?home"><i class="fa-solid fa-house-chimney"></i> Home</a>
             </div>
+            <?php endif; ?>
 
 
 
             <!-- ===== CATALOG / KHO ===== -->
-            <?php if ($isWarehouseRole || $isManagerRole || $isAdminRole) : ?>
+            <?php if ($isWarehouseRole || $isAdminRole) : ?>
                 <div class="nav-section-label">KHO HÀNG</div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['loai']) ? 'active' : '' ?>"
@@ -122,7 +124,7 @@ if ($isManagerOrAdmin) {
             <?php endif; ?>
 
             <!-- ===== BÁN HÀNG ===== -->
-            <?php if ($isSalesRole || $isManagerRole || $isAdminRole) : ?>
+            <?php if ($isSalesRole || $isAdminRole) : ?>
                 <div class="nav-section-label">BÁN HÀNG</div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['donhang']) ? 'active' : '' ?>"
@@ -135,25 +137,28 @@ if ($isManagerOrAdmin) {
             <?php endif; ?>
         </div>
 
-        <!-- ===== QUẢN LÝ (Manager/Admin) ===== -->
+        <!-- ===== QUẢN LÝ NHÂN SỰ (Manager) ===== -->
         <?php if ($isManagerRole) : ?>
             <hr>
             <div class="container-fluid admin-head">
-                <h5 class="text-center py-2 fw-bold">Quản Lý</h5>
+                <h5 class="text-center py-2 fw-bold">Quản Lý Nhân Sự</h5>
             </div>
             <div class="navs text-center p-0">
-                <!-- Khu vực dành riêng cho Manager (HR) -->
-                <div class="container-fluid">
-                    <a class="text-truncate <?= isset($_GET['nhansu']) ? 'active' : '' ?>"
-                       href="user_page.php?nhansu"><i class="fa-solid fa-users"></i> DS Nhân sự (Tài khoản)</a>
-                </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['chucvu']) ? 'active' : '' ?>"
                        href="user_page.php?chucvu"><i class="fa-solid fa-briefcase"></i> Chức vụ</a>
                 </div>
                 <div class="container-fluid">
+                    <a class="text-truncate <?= isset($_GET['nhansu']) ? 'active' : '' ?>"
+                       href="user_page.php?nhansu"><i class="fa-solid fa-users"></i> DS nhân sự</a>
+                </div>
+                <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['bangluong']) ? 'active' : '' ?>"
-                       href="user_page.php?bangluong"><i class="fa-solid fa-money-bill-wave"></i> Bảng lương</a>
+                       href="user_page.php?bangluong"><i class="fa-solid fa-file-invoice-dollar"></i> Lương</a>
+                </div>
+                <div class="container-fluid">
+                    <a class="text-truncate <?= isset($_GET['luong_ca_nhan']) ? 'active' : '' ?>"
+                       href="user_page.php?luong_ca_nhan"><i class="fa-solid fa-wallet"></i> Lương của tôi</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['donnghi']) ? 'active' : '' ?>"
@@ -168,18 +173,23 @@ if ($isManagerOrAdmin) {
                     <a class="text-truncate <?= isset($_GET['donnghiviec']) ? 'active' : '' ?>"
                        href="user_page.php?donnghiviec"><i class="fa-solid fa-door-open"></i> Đơn nghỉ việc</a>
                 </div>
+                <div class="container-fluid">
+                    <a class="text-truncate <?= isset($_GET['profile']) ? 'active' : '' ?>"
+                       href="user_page.php?profile"><i class="fa-solid fa-user-pen"></i> Hồ sơ cá nhân</a>
+                </div>
             </div>
         <?php endif; ?>
 
-        <!-- ===== NHÂN VIÊN: menu cá nhân ===== -->
+        <!-- ===== NHÂN VIÊN (Khác Manager/Admin): menu cá nhân ===== -->
+        <?php if (!$isManagerRole && !$isAdminRole) : ?>
         <hr class="mt-2">
         <div class="navs text-center p-0">
             <div class="container-fluid">
-                <a class="text-truncate <?= isset($_GET['donnghi']) && !$isManagerOrAdmin ? 'active' : '' ?>"
+                <a class="text-truncate <?= isset($_GET['donnghi']) ? 'active' : '' ?>"
                    href="user_page.php?donnghi"><i class="fa-solid fa-calendar-minus"></i> Đơn nghỉ phép</a>
             </div>
             <div class="container-fluid">
-                <a class="text-truncate <?= isset($_GET['donnghiviec']) && !$isManagerOrAdmin ? 'active' : '' ?>"
+                <a class="text-truncate <?= isset($_GET['donnghiviec']) ? 'active' : '' ?>"
                    href="user_page.php?donnghiviec"><i class="fa-solid fa-door-open"></i> Đơn nghỉ việc</a>
             </div>
             <div class="container-fluid">
@@ -191,6 +201,7 @@ if ($isManagerOrAdmin) {
                    href="user_page.php?profile"><i class="fa-solid fa-user-pen"></i> Hồ sơ cá nhân</a>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- ===== USER INFO ===== -->
         <div class="navs text-center p-0">
@@ -209,7 +220,9 @@ if ($isManagerOrAdmin) {
     </div>
 
     <div class="app-right">
+        <?php if (!isset($_GET['home']) && !isset($_GET['dashboard'])): ?>
         <div class="app-topbar px-3">
             <h4 class="mb-0 fw-bold"><?= htmlspecialchars($currentTitle) ?></h4>
         </div>
-        <div class="main p-0">
+        <?php endif; ?>
+        <div class="main p-0 <?= (isset($_GET['home']) || isset($_GET['dashboard'])) ? 'h-100' : '' ?>">

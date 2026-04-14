@@ -14,8 +14,8 @@ if (isset($_POST['submit_resignation'])) {
     $reason = trim(mysqli_real_escape_string($conn, $_POST['reason'] ?? ''));
     $today = date('Y-m-d');
 
-    if ($effective_date <= $today) {
-        $msg_error = 'Ngày nghỉ hiệu lực phải sau ngày hôm nay.';
+    if ($effective_date < $today) {
+        $msg_error = 'Ngày nghỉ hiệu lực không được ở quá khứ.';
     } elseif ($reason === '') {
         $msg_error = 'Lý do không được để trống.';
     } else {
@@ -52,12 +52,15 @@ if ($isManager && isset($_POST['approve_resignation'])) {
     mysqli_query($conn, "UPDATE resignation_requests SET status='$new_status', approved_by=$uid,
                           approved_at=NOW(), notes='$notes'
                           WHERE resignation_request_id=$rid");
-    // Nếu chấp thuận, set account inactive
+    // Nếu chấp thuận, khóa tài khoản và chuyển trạng thái nhân sự ngay lập tức
     if ($action === 'approve') {
         $acc_query = mysqli_query($conn, "SELECT account_id FROM resignation_requests WHERE resignation_request_id=$rid");
         if ($acc_row = mysqli_fetch_assoc($acc_query)) {
             $target_acc = (int)$acc_row['account_id'];
-            // Sẽ inactive sau khi effective_date
+            // Cập nhật trạng thái nhân sự thành 'resigned' và khóa hệ thống
+            mysqli_query($conn, "UPDATE accounts 
+                                 SET hr_status = 'resigned', system_status = 'locked' 
+                                 WHERE account_id = $target_acc");
         }
     }
     $msg_success = 'Đã ' . ($action === 'approve' ? 'chấp thuận' : 'từ chối') . ' đơn nghỉ việc.';
@@ -96,9 +99,9 @@ $status_class = ['chờ duyệt'=>'warning','chấp thuận'=>'success','từ ch
         <div class="alert alert-danger"><?= htmlspecialchars($msg_error) ?></div>
     <?php endif; ?>
 
-    <div class="alert alert-warning">
-        <i class="fa-solid fa-triangle-exclamation me-2"></i>
-        <b>Lưu ý:</b> Đơn nghỉ việc cần thời gian thông báo trước ít nhất <b>30 ngày</b> theo quy định công ty.
+    <div class="alert alert-info">
+        <i class="fa-solid fa-circle-info me-2"></i>
+        <b>Lưu ý:</b> Đơn nghỉ việc sau khi được phê duyệt sẽ <b>khóa tài khoản</b> và chấm dứt quyền truy cập hệ thống ngay lập tức.
     </div>
 
     <div class="container-fluid">
@@ -118,9 +121,9 @@ $status_class = ['chờ duyệt'=>'warning','chấp thuận'=>'success','từ ch
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Ngày nghỉ hiệu lực</label>
                                 <input type="date" class="form-control" name="effective_date"
-                                       min="<?= date('Y-m-d', strtotime('+30 days')) ?>"
-                                       value="<?= date('Y-m-d', strtotime('+30 days')) ?>" required>
-                                <small class="text-muted">Tối thiểu 30 ngày kể từ hôm nay</small>
+                                       min="<?= date('Y-m-d') ?>"
+                                       value="<?= date('Y-m-d') ?>" required>
+                                <small class="text-muted">Chọn ngày bắt đầu nghỉ việc</small>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Lý do nghỉ việc</label>

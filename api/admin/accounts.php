@@ -19,7 +19,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 try {
     if ($method === 'GET') {
-        $sql = "SELECT a.account_id, a.full_name, a.email, a.role_id, r.name AS role_name, a.hr_status, a.system_status, a.created_at,
+        $sql = "SELECT a.account_id, a.full_name, a.email, a.role_id, a.position_id, r.name AS role_name, a.hr_status, a.system_status, a.created_at,
                        a.phone, a.address, a.birth_date, a.gender, a.hire_date
                 FROM accounts a
                 JOIN roles r ON r.id = a.role_id
@@ -28,11 +28,11 @@ try {
         $result = mysqli_query($conn, $sql);
         $accounts = $result ? mysqli_fetch_all($result, MYSQLI_ASSOC) : [];
         
-        // Đính kèm danh sách roles để frontend render dropdown (Loại trừ Admin)
-        $roles_result = mysqli_query($conn, "SELECT id, name FROM roles WHERE name != 'admin' ORDER BY id ASC");
-        $roles = $roles_result ? mysqli_fetch_all($roles_result, MYSQLI_ASSOC) : [];
+        // Đính kèm danh sách positions (Bao gồm Role ID ẩn bên trong)
+        $pos_result = mysqli_query($conn, "SELECT position_id, position_name, base_salary FROM positions WHERE position_id != 1 AND is_active = 1 ORDER BY position_name ASC");
+        $positions = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
 
-        echo json_encode(['success' => true, 'data' => $accounts, 'roles' => $roles]);
+        echo json_encode(['success' => true, 'data' => $accounts, 'positions' => $positions]);
         exit;
     }
 
@@ -46,15 +46,17 @@ try {
         $full_name = trim(mysqli_real_escape_string($conn, $data['full_name'] ?? ''));
         $email = trim(mysqli_real_escape_string($conn, $data['email'] ?? ''));
         $password = trim($data['password'] ?? '');
-        $role_id = (int)($data['role_id'] ?? 0);
+        $position_id = (int)($data['position_id'] ?? 0);
+        $role_id = $position_id; // Thống nhất Vai trò = Chức vụ
         
         $phone = trim(mysqli_real_escape_string($conn, $data['phone'] ?? ''));
         $address = trim(mysqli_real_escape_string($conn, $data['address'] ?? ''));
         $birth_date = !empty($data['birth_date']) ? "'".mysqli_real_escape_string($conn, $data['birth_date'])."'" : "NULL";
         $gender = mysqli_real_escape_string($conn, $data['gender'] ?? 'nam');
-        $hire_date = !empty($data['hire_date']) ? "'".mysqli_real_escape_string($conn, $data['hire_date'])."'" : "NULL";
+        $hire_date = !empty($data['hire_date']) ? "'".mysqli_real_escape_string($conn, $data['hire_date'])."'" : "CURDATE()";
+        $position_id = (int)($data['position_id'] ?? 0);
 
-        if (!$full_name || !$email || !$password || !$role_id) {
+        if (!$full_name || !$email || !$password || !$position_id) {
             echo json_encode(['success' => false, 'message' => 'Vui lòng cung cấp đầy đủ thông tin']);
             exit;
         }
@@ -77,11 +79,18 @@ try {
         
         $system_status = (currentRole() === AppRole::ADMIN) ? 'active' : 'pending';
 
-        $sql = "INSERT INTO accounts (full_name, email, password, role_id, hr_status, system_status, phone, address, birth_date, gender, hire_date) 
-                VALUES ('$full_name', '$email', '$hashed_password', $role_id, '$hr_status', '$system_status', '$phone', '$address', $birth_date, '$gender', $hire_date)";
+        $sql = "INSERT INTO accounts (full_name, email, password, role_id, hr_status, system_status, phone, address, birth_date, gender, hire_date, position_id) 
+                VALUES ('$full_name', '$email', '$hashed_password', $role_id, '$hr_status', '$system_status', '$phone', '$address', $birth_date, '$gender', $hire_date, " . ($position_id > 0 ? $position_id : "NULL") . ")";
         
         if (mysqli_query($conn, $sql)) {
-            echo json_encode(['success' => true, 'message' => 'Thêm tài khoản thành công', 'id' => mysqli_insert_id($conn)]);
+            $new_id = mysqli_insert_id($conn);
+            // Tự động tạo lịch sử chức vụ nếu có chọn chức vụ
+            if ($position_id > 0) {
+                $start_history = $hire_date;
+                mysqli_query($conn, "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason, created_by)
+                                      VALUES ($new_id, $position_id, $start_history, 'Khởi tạo nhân sự mới', " . currentUserId() . ")");
+            }
+            echo json_encode(['success' => true, 'message' => 'Thêm tài khoản thành công', 'id' => $new_id]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Đã xảy ra lỗi khi thêm tài khoản', 'error' => mysqli_error($conn)]);
         }
@@ -94,15 +103,17 @@ try {
         $full_name = trim(mysqli_real_escape_string($conn, $data['full_name'] ?? ''));
         $email = trim(mysqli_real_escape_string($conn, $data['email'] ?? ''));
         $password = trim($data['password'] ?? '');
-        $role_id = (int)($data['role_id'] ?? 0);
+        $position_id = (int)($data['position_id'] ?? 0);
+        $role_id = $position_id; // Thống nhất Vai trò = Chức vụ
         
         $phone = trim(mysqli_real_escape_string($conn, $data['phone'] ?? ''));
         $address = trim(mysqli_real_escape_string($conn, $data['address'] ?? ''));
         $birth_date = !empty($data['birth_date']) ? "'".mysqli_real_escape_string($conn, $data['birth_date'])."'" : "NULL";
         $gender = mysqli_real_escape_string($conn, $data['gender'] ?? 'nam');
-        $hire_date = !empty($data['hire_date']) ? "'".mysqli_real_escape_string($conn, $data['hire_date'])."'" : "NULL";
+        $hire_date = !empty($data['hire_date']) ? "'".mysqli_real_escape_string($conn, $data['hire_date'])."'" : "CURDATE()";
+        $position_id = (int)($data['position_id'] ?? 0);
 
-        if ($account_id <= 0 || !$full_name || !$email || !$role_id) {
+        if ($account_id <= 0 || !$full_name || !$email || !$position_id) {
             echo json_encode(['success' => false, 'message' => 'Dữ liệu không hợp lệ']);
             exit;
         }
@@ -139,11 +150,24 @@ try {
 
         $sql = "UPDATE accounts 
                 SET full_name = '$full_name', email = '$email', phone = '$phone', address = '$address', 
-                    birth_date = $birth_date, gender = '$gender', hire_date = $hire_date
+                    birth_date = $birth_date, gender = '$gender', hire_date = $hire_date,
+                    position_id = " . ($position_id > 0 ? $position_id : "NULL") . "
                     $role_sql $password_sql 
                 WHERE account_id = $account_id";
         
+        // Kiểm tra xem position có thay đổi không để cập nhật history
+        $oldRes = mysqli_query($conn, "SELECT position_id FROM accounts WHERE account_id = $account_id");
+        $oldRow = mysqli_fetch_assoc($oldRes);
+        $old_pos = (int)($oldRow['position_id'] ?? 0);
+
         if (mysqli_query($conn, $sql)) {
+            if ($position_id > 0 && $position_id !== $old_pos) {
+                // Đóng history cũ nếu có
+                mysqli_query($conn, "UPDATE employee_positions_history SET end_date = CURDATE() WHERE account_id = $account_id AND end_date IS NULL");
+                // Mở history mới
+                mysqli_query($conn, "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason, created_by)
+                                      VALUES ($account_id, $position_id, CURDATE(), 'Cập nhật từ hồ sơ nhân sự', " . currentUserId() . ")");
+            }
             echo json_encode(['success' => true, 'message' => 'Cập nhật tài khoản thành công']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Lỗi cập nhật', 'error' => mysqli_error($conn)]);

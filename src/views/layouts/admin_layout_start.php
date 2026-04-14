@@ -356,6 +356,7 @@ $user_name = $GLOBALS['user_name'] ?? 'Admin';
 
         <!-- MAIN LAYOUT -->
         <main class="admin-content" id="adminContent">
+            <?php if (!isset($_GET['home']) && !isset($_GET['dashboard'])): ?>
             <header class="admin-header">
                 <div class="d-flex align-items-center gap-3">
                     <button class="toggle-btn" id="sidebarToggle" onclick="toggleSidebar()">
@@ -364,8 +365,9 @@ $user_name = $GLOBALS['user_name'] ?? 'Admin';
                     <h1 class="admin-header-title"><?= htmlspecialchars($currentTitle) ?></h1>
                 </div>
             </header>
+            <?php endif; ?>
             
-            <div class="admin-main-body">
+            <div class="admin-main-body <?= (isset($_GET['home']) || isset($_GET['dashboard'])) ? 'pt-0' : '' ?>">
 
             <script>
                 function toggleSidebar() {
