@@ -93,7 +93,7 @@ if ($isManagerOrAdmin) {
 
 
             <!-- ===== CATALOG / KHO ===== -->
-            <?php if ($isWarehouseRole || $isManagerRole) : ?>
+            <?php if ($isWarehouseRole || $isManagerRole || $isAdminRole) : ?>
                 <div class="nav-section-label">KHO HÀNG</div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['loai']) ? 'active' : '' ?>"
@@ -122,7 +122,7 @@ if ($isManagerOrAdmin) {
             <?php endif; ?>
 
             <!-- ===== BÁN HÀNG ===== -->
-            <?php if ($isSalesRole || $isManagerRole) : ?>
+            <?php if ($isSalesRole || $isManagerRole || $isAdminRole) : ?>
                 <div class="nav-section-label">BÁN HÀNG</div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['donhang']) ? 'active' : '' ?>"
@@ -143,6 +143,10 @@ if ($isManagerOrAdmin) {
             </div>
             <div class="navs text-center p-0">
                 <!-- Khu vực dành riêng cho Manager (HR) -->
+                <div class="container-fluid">
+                    <a class="text-truncate <?= isset($_GET['nhansu']) ? 'active' : '' ?>"
+                       href="user_page.php?nhansu"><i class="fa-solid fa-users"></i> DS Nhân sự (Tài khoản)</a>
+                </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['chucvu']) ? 'active' : '' ?>"
                        href="user_page.php?chucvu"><i class="fa-solid fa-briefcase"></i> Chức vụ</a>

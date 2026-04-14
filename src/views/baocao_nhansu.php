@@ -20,19 +20,19 @@ $wage_r = mysqli_query($conn, $wage_sql);
 $wage_summary = $wage_r ? mysqli_fetch_assoc($wage_r) : [];
 
 // 2. Thống kê số lượng nhân sự
-$emp_status_r = mysqli_query($conn, "SELECT status, COUNT(*) as c FROM accounts WHERE role_id!=1 GROUP BY status");
+$emp_status_r = mysqli_query($conn, "SELECT hr_status, COUNT(*) as c FROM accounts WHERE role_id!=1 GROUP BY hr_status");
 $total_active = 0;
 $total_inactive = 0;
 if ($emp_status_r) {
     while($row = mysqli_fetch_assoc($emp_status_r)) {
-        if ($row['status'] === 'active') $total_active = (int)$row['c'];
+        if ($row['hr_status'] === 'active') $total_active = (int)$row['c'];
         else $total_inactive += (int)$row['c'];
     }
 }
 $total_emp = $total_active + $total_inactive;
 
 // 2b. Thống kê theo phòng ban / chức vụ (chỉ tính loại đang làm)
-$emp_pos_r = mysqli_query($conn, "SELECT p.position_name, COUNT(a.account_id) as c FROM accounts a LEFT JOIN positions p ON a.position_id = p.position_id WHERE a.status='active' AND a.role_id!=1 GROUP BY p.position_name ORDER BY c DESC");
+$emp_pos_r = mysqli_query($conn, "SELECT p.position_name, COUNT(a.account_id) as c FROM accounts a LEFT JOIN positions p ON a.position_id = p.position_id WHERE a.hr_status='active' AND a.role_id!=1 GROUP BY p.position_name ORDER BY c DESC");
 $emp_by_pos = $emp_pos_r ? mysqli_fetch_all($emp_pos_r, MYSQLI_ASSOC) : [];
 
 // 3. Lương từng tháng trong năm (chart)

@@ -52,9 +52,11 @@ if (isset($_POST['change_employee_position'])) {
     }
 }
 
-// Lấy danh sách chức vụ
-$positions_sql = "SELECT p.*, (SELECT COUNT(*) FROM accounts a WHERE a.position_id = p.position_id AND a.status='active') AS employee_count
-                  FROM positions p ORDER BY p.is_active DESC, p.base_salary DESC";
+// Lấy danh sách chức vụ, loại bỏ position_id 4 (Quản trị viên)
+$positions_sql = "SELECT p.*, (SELECT COUNT(*) FROM accounts a WHERE a.position_id = p.position_id AND a.hr_status='active') AS employee_count
+                  FROM positions p 
+                  WHERE p.position_id != 4
+                  ORDER BY p.is_active DESC, p.base_salary DESC";
 $pos_result = mysqli_query($conn, $positions_sql);
 $positions = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
 
@@ -64,7 +66,7 @@ $emp_sql = "SELECT a.account_id, a.full_name, r.display_name AS role_name,
             FROM accounts a
             JOIN roles r ON r.id = a.role_id
             LEFT JOIN positions p ON p.position_id = a.position_id
-            WHERE a.status = 'active' AND a.role_id != 1
+            WHERE a.hr_status = 'active' AND a.role_id != 1 AND a.position_id != 4
             ORDER BY a.full_name";
 $emp_result = mysqli_query($conn, $emp_sql);
 $employees = $emp_result ? mysqli_fetch_all($emp_result, MYSQLI_ASSOC) : [];
@@ -277,25 +279,42 @@ if ($edit_pos_id > 0) {
             <div class="modal-body" id="historyModalBody">
                 <div class="text-center"><div class="spinner-border text-primary"></div></div>
             </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
+let historyModalObj = null;
+
 function viewHistory(accId, name) {
+    const modalEl = document.getElementById('historyModal');
     document.getElementById('historyModalTitle').textContent = 'Lịch sử chức vụ: ' + name;
     document.getElementById('historyModalBody').innerHTML = '<div class="text-center"><div class="spinner-border text-primary"></div></div>';
-    new bootstrap.Modal(document.getElementById('historyModal')).show();
+    
+    if (!historyModalObj) {
+        historyModalObj = new bootstrap.Modal(modalEl);
+    }
+    historyModalObj.show();
 
     fetch('user_page.php?chucvu_history_api=1&account_id=' + accId)
         .then(r => r.json())
         .then(data => {
             let html = '<table class="table table-sm table-striped"><thead><tr><th>Chức vụ</th><th>Từ ngày</th><th>Đến ngày</th><th>Lý do</th></tr></thead><tbody>';
-            data.forEach(h => {
-                html += `<tr><td>${h.position_name}</td><td>${h.start_date}</td><td>${h.end_date||'<span class="badge bg-success">Hiện tại</span>'}</td><td>${h.reason||'-'}</td></tr>`;
-            });
-            html += '</tbody></table>';
-            document.getElementById('historyModalBody').innerHTML = html || '<p class="text-muted">Chưa có lịch sử.</p>';
+            if (data && data.length > 0) {
+                data.forEach(h => {
+                    html += `<tr><td>${h.position_name}</td><td>${h.start_date}</td><td>${h.end_date||'<span class="badge bg-success">Hiện tại</span>'}</td><td>${h.reason||'-'}</td></tr>`;
+                });
+                html += '</tbody></table>';
+            } else {
+                html = '<p class="text-muted text-center my-3">Chưa có lịch sử biến động chức vụ.</p>';
+            }
+            document.getElementById('historyModalBody').innerHTML = html;
+        })
+        .catch(err => {
+            document.getElementById('historyModalBody').innerHTML = '<p class="text-danger">Lỗi tải dữ liệu lịch sử.</p>';
         });
 }
 </script>

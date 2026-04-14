@@ -10,6 +10,120 @@ $sel_month = (int)($_GET['month'] ?? date('m'));
 $sel_year  = (int)($_GET['year'] ?? date('Y'));
 $sel_year  = max(2020, min($sel_year, 2030));
 
+/**
+ * Tính khấu trừ tự động dựa trên số ngày nghỉ và chức vụ tại thời điểm nghỉ
+ * Công thức: Σ (Lương CB của chức vụ lúc đó / 30) * số ngày nghỉ tương ứng
+ */
+function getAutoDeduction($conn, $accountId, $month, $year) {
+    $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
+    $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
+    
+    // 1. Lấy tất cả các ngày nghỉ được chấp thuận trong tháng
+    $sql = "SELECT from_date, to_date FROM leave_requests 
+            WHERE account_id = $accountId AND status = 'chấp thuận'
+            AND from_date <= '$endOfMonth' AND to_date >= '$startOfMonth'";
+    $res = mysqli_query($conn, $sql);
+    
+    $leaveDates = [];
+    if ($res) {
+        while ($row = mysqli_fetch_assoc($res)) {
+            $curr = max(strtotime($row['from_date']), strtotime($startOfMonth));
+            $last = min(strtotime($row['to_date']), strtotime($endOfMonth));
+            while ($curr <= $last) {
+                $leaveDates[] = date('Y-m-d', $curr);
+                $curr = strtotime('+1 day', $curr);
+            }
+        }
+    }
+    $leaveDates = array_unique($leaveDates);
+    if (empty($leaveDates)) return ['total' => 0, 'days' => 0];
+
+    // 2. Lấy lịch sử chức vụ ảnh hưởng đến tháng này
+    $sql = "SELECT eph.start_date, eph.end_date, p.base_salary
+            FROM employee_positions_history eph
+            JOIN positions p ON p.position_id = eph.position_id
+            WHERE eph.account_id = $accountId
+            AND eph.start_date <= '$endOfMonth'
+            AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')
+            ORDER BY eph.start_date ASC";
+    $res = mysqli_query($conn, $sql);
+    $history = $res ? mysqli_fetch_all($res, MYSQLI_ASSOC) : [];
+
+    $totalDeduction = 0;
+    foreach ($leaveDates as $d) {
+        $dailySalaryForDay = 0;
+        foreach ($history as $h) {
+            $hStart = $h['start_date'];
+            $hEnd = $h['end_date'] ?: '9999-12-31';
+            if ($d >= $hStart && $d <= $hEnd) {
+                $dailySalaryForDay = (int)$h['base_salary'] / 30;
+                break;
+            }
+        }
+        // Nếu không tìm thấy lịch sử cho ngày đó, có thể dùng lương hiện tại của user
+        if ($dailySalaryForDay == 0) {
+            $currentPosRes = mysqli_query($conn, "SELECT p.base_salary FROM accounts a JOIN positions p ON p.position_id = a.position_id WHERE a.account_id = $accountId");
+            $cp = mysqli_fetch_assoc($currentPosRes);
+            $dailySalaryForDay = ($cp['base_salary'] ?? 0) / 30;
+        }
+        $totalDeduction += $dailySalaryForDay;
+    }
+    
+    return ['total' => round($totalDeduction), 'days' => count($leaveDates)];
+}
+
+/**
+ * Tính lương cơ bản gộp (Pro-rated) dựa trên lịch sử chức vụ
+ * Công thức: Σ (Số ngày giữ chức vụ / 30) * Lương CB của chức vụ đó
+ */
+function getProRatedBaseSalary($conn, $accountId, $month, $year) {
+    $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
+    $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
+    $startTs = strtotime($startOfMonth);
+    $endTs = strtotime($endOfMonth);
+
+    // Lấy lịch sử chức vụ ảnh hưởng đến tháng này
+    $sql = "SELECT eph.start_date, eph.end_date, p.base_salary
+            FROM employee_positions_history eph
+            JOIN positions p ON p.position_id = eph.position_id
+            WHERE eph.account_id = $accountId
+            AND eph.start_date <= '$endOfMonth'
+            AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')
+            ORDER BY eph.start_date ASC";
+    $res = mysqli_query($conn, $sql);
+    $history = $res ? mysqli_fetch_all($res, MYSQLI_ASSOC) : [];
+
+    if (empty($history)) {
+        // Fallback: Lấy lương hiện tại
+        $sql = "SELECT p.base_salary FROM accounts a 
+                JOIN positions p ON p.position_id = a.position_id 
+                WHERE a.account_id = $accountId";
+        $cp_res = mysqli_query($conn, $sql);
+        $cp = mysqli_fetch_assoc($cp_res);
+        return ['total' => (int)($cp['base_salary'] ?? 0), 'is_prorated' => false];
+    }
+
+    $totalBaseSalary = 0;
+    foreach ($history as $h) {
+        $hStart = strtotime($h['start_date']);
+        $hEnd = $h['end_date'] ? strtotime($h['end_date']) : strtotime('2099-12-31');
+
+        $overlapStart = max($hStart, $startTs);
+        $overlapEnd = min($hEnd, $endTs);
+
+        if ($overlapStart <= $overlapEnd) {
+            $days = floor(($overlapEnd - $overlapStart) / 86400) + 1;
+            // Công thức: (Ngày / 30) * Lương
+            $totalBaseSalary += ($days * (int)$h['base_salary']) / 30;
+        }
+    }
+
+    return [
+        'total' => round($totalBaseSalary), 
+        'is_prorated' => count($history) > 1
+    ];
+}
+
 // Lưu/cập nhật lương
 if (isset($_POST['save_salary'])) {
     $acc_id     = (int)($_POST['account_id'] ?? 0);
@@ -22,7 +136,8 @@ if (isset($_POST['save_salary'])) {
     $by         = currentUserId();
 
     if ($acc_id > 0) {
-        $call = "CALL CalculateEmployeeSalary($acc_id, $month, $year, $allowance, $bonus, $deductions, $by, '$notes')";
+        $base_salary = (int)($_POST['base_salary_val'] ?? 0); // Lấy giá trị thực tế truyền từ UI
+        $call = "CALL CalculateEmployeeSalary($acc_id, $month, $year, $base_salary, $allowance, $bonus, $deductions, $by, '$notes')";
         if (mysqli_multi_query($conn, $call)) {
             do { $r = mysqli_store_result($conn); if ($r) mysqli_free_result($r); } while (mysqli_more_results($conn) && mysqli_next_result($conn));
             $msg_success = 'Đã tính và lưu lương thành công.';
@@ -45,10 +160,25 @@ $emp_sql = "SELECT a.account_id, a.full_name, r.display_name AS role_name,
             FROM accounts a
             JOIN roles r ON r.id = a.role_id
             LEFT JOIN positions p ON p.position_id = a.position_id
-            WHERE a.status = 'active' AND a.role_id != 1
+            WHERE a.hr_status = 'active' AND a.role_id != 1 AND a.position_id != 4
             ORDER BY a.full_name";
 $emp_result = mysqli_query($conn, $emp_sql);
-$employees = $emp_result ? mysqli_fetch_all($emp_result, MYSQLI_ASSOC) : [];
+$employees = [];
+if ($emp_result) {
+    while ($e = mysqli_fetch_assoc($emp_result)) {
+        // Khấu trừ nghỉ
+        $deductInfo = getAutoDeduction($conn, $e['account_id'], $sel_month, $sel_year);
+        $e['auto_deduction'] = $deductInfo['total'];
+        $e['leave_days'] = $deductInfo['days'];
+
+        // Lương cơ bản gộp (Pro-rated)
+        $proRateInfo = getProRatedBaseSalary($conn, $e['account_id'], $sel_month, $sel_year);
+        $e['base_salary'] = $proRateInfo['total'];
+        $e['is_prorated'] = $proRateInfo['is_prorated'];
+
+        $employees[] = $e;
+    }
+}
 
 // Bản ghi lương tháng đã chọn (dùng view)
 $salary_sql = "SELECT sr.salary_record_id, sr.account_id, sr.salary_month, sr.salary_year,
@@ -89,7 +219,6 @@ if (isset($_GET['print'])) {
     .tr{text-align:right}
     </style></head><body>
     <h2>BẢNG LƯƠNG THÁNG <?= $sel_month ?>/<?= $sel_year ?></h2>
-    <h3>Công ty ElderCoffee</h3>
     <table>
     <thead><tr><th>#</th><th>Họ tên</th><th>Chức vụ</th><th>Lương CB</th><th>Phụ cấp</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực lĩnh</th><th>Ghi chú</th></tr></thead>
     <tbody>
@@ -112,8 +241,11 @@ if (isset($_GET['print'])) {
     <td class="tr"><?=number_format($total_pay,0,',','.')?></td>
     <td></td></tr></tfoot>
     </table>
-    <p>Ngày in: <?=date('d/m/Y H:i')?></p>
-    <script>window.print()</script></body></html>
+    <script>
+    window.print();
+    // Quay lại trang lương sau khi in xong hoặc hủy
+    window.location.href = 'user_page.php?bangluong&month=<?= $sel_month ?>&year=<?= $sel_year ?>';
+    </script></body></html>
     <?php
     exit;
 }
@@ -152,7 +284,7 @@ if (isset($_GET['print'])) {
         </div>
         <div class="col-auto ms-auto">
             <a class="btn btn-outline-secondary"
-               href="user_page.php?bangluong&month=<?=$sel_month?>&year=<?=$sel_year?>&print=1" target="_blank">
+               href="user_page.php?bangluong&month=<?=$sel_month?>&year=<?=$sel_year?>&print=1">
                 <i class="fa-solid fa-print me-1"></i>In bảng lương
             </a>
         </div>
@@ -212,16 +344,21 @@ if (isset($_GET['print'])) {
                                 <?php foreach ($employees as $emp): ?>
                                 <option value="<?= $emp['account_id'] ?>"
                                         data-salary="<?= $emp['base_salary'] ?>"
+                                        data-deduction="<?= $emp['auto_deduction'] ?>"
+                                        data-leave="<?= $emp['leave_days'] ?>"
+                                        data-prorated="<?= $emp['is_prorated'] ? '1' : '0' ?>"
                                         data-pos="<?= htmlspecialchars($emp['position_name'] ?? '') ?>">
                                     <?= htmlspecialchars($emp['full_name']) ?>
+                                    <?= $emp['is_prorated'] ? ' (Gộp)' : '' ?>
                                     <?= in_array($emp['account_id'], $has_salary) ? '✓' : '' ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="mb-2">
-                            <label class="form-label">Lương cơ bản (tự động)</label>
+                            <label class="form-label">Lương cơ bản (tự động) <span id="prorateHint" class="text-info small ms-2"></span></label>
                             <input type="text" class="form-control bg-light" id="baseSalaryDisplay" disabled>
+                            <input type="hidden" name="base_salary_val" id="baseSalaryHidden">
                         </div>
                         <div class="mb-2">
                             <label class="form-label fw-bold">Phụ cấp (VND)</label>
@@ -234,9 +371,9 @@ if (isset($_GET['print'])) {
                                    value="0" min="0" step="100000" onchange="calcTotal()">
                         </div>
                         <div class="mb-2">
-                            <label class="form-label fw-bold">Khấu trừ (VND)</label>
+                            <label class="form-label fw-bold">Khấu trừ (VND) <span id="leaveHint" class="text-danger small ms-2"></span></label>
                             <input type="number" class="form-control" name="deductions" id="deductInput"
-                                   value="0" min="0" step="100000" onchange="calcTotal()">
+                                   value="0" min="0" step="1" onchange="calcTotal()">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Thực lĩnh (ước tính)</label>
@@ -343,8 +480,38 @@ if (isset($_GET['print'])) {
 <script>
 function fillBaseSalary(sel) {
     const option = sel.options[sel.selectedIndex];
+    if (!option.value) {
+        document.getElementById('baseSalaryDisplay').value = '';
+        document.getElementById('baseSalaryHidden').value = '';
+        document.getElementById('deductInput').value = 0;
+        document.getElementById('leaveHint').textContent = '';
+        document.getElementById('prorateHint').textContent = '';
+        window._baseSalary = 0;
+        calcTotal();
+        return;
+    }
+
     const salary = parseInt(option.dataset.salary) || 0;
+    const autoDeduct = parseInt(option.dataset.deduction) || 0;
+    const leaveDays = parseInt(option.dataset.leave) || 0;
+    const isProrated = option.dataset.prorated === '1';
+
     document.getElementById('baseSalaryDisplay').value = salary.toLocaleString('vi-VN') + ' VND';
+    document.getElementById('baseSalaryHidden').value = salary; 
+    document.getElementById('deductInput').value = autoDeduct;
+    
+    if (leaveDays > 0) {
+        document.getElementById('leaveHint').textContent = `(Tự động: trừ ${leaveDays} ngày nghỉ)`;
+    } else {
+        document.getElementById('leaveHint').textContent = '';
+    }
+
+    if (isProrated) {
+        document.getElementById('prorateHint').textContent = '(Đã tính gộp theo lịch sử chức vụ)';
+    } else {
+        document.getElementById('prorateHint').textContent = '';
+    }
+
     window._baseSalary = salary;
     calcTotal();
 }

@@ -18,6 +18,10 @@ if (isset($_GET['home']) || isset($_GET['dashboard'])) {
     $currentTitle = 'Báo Cáo Kho';
 } elseif (isset($_GET['baocao_nhansu'])) {
     $currentTitle = 'Báo Cáo Nhân Sự';
+} elseif (isset($_GET['chucvu'])) {
+    $currentTitle = 'Quản lý Chức vụ & Bổ nhiệm';
+} elseif (isset($_GET['bangluong'])) {
+    $currentTitle = 'Bảng lương Nhân viên';
 } elseif (isset($_GET['luong_ca_nhan'])) {
     $currentTitle = 'Lương Của Tôi';
 } elseif (isset($_GET['profile'])) {
@@ -267,7 +271,8 @@ $user_name = $GLOBALS['user_name'] ?? 'Admin';
         .table-responsive thead th {
             position: sticky;
             top: 0;
-            background-color: #f8f9fa;
+            background-color: var(--admin-primary);
+            color: white;
             z-index: 10;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
@@ -329,10 +334,6 @@ $user_name = $GLOBALS['user_name'] ?? 'Admin';
                 </a>
 
                 <div class="admin-menu-header"><span>Cá Nhân</span></div>
-                <a href="<?= $baseUrl ?>user_page.php?luong_ca_nhan" class="admin-menu-item <?= isset($_GET['luong_ca_nhan']) ? 'active' : '' ?>">
-                    <i class="fa-solid fa-wallet admin-menu-icon"></i>
-                    <span class="admin-menu-text">Lương của tôi</span>
-                </a>
                 <a href="<?= $baseUrl ?>user_page.php?profile" class="admin-menu-item <?= isset($_GET['profile']) ? 'active' : '' ?>">
                     <i class="fa-solid fa-id-card admin-menu-icon"></i>
                     <span class="admin-menu-text">Hồ sơ cá nhân</span>

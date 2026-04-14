@@ -10,9 +10,11 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
             <div>
                 <span class="text-muted"><i class="fa-solid fa-circle-info me-2"></i>Vì lý do bảo mật dữ liệu lịch sử, không hỗ trợ chức năng xóa (DELETE) tài khoản. Chỉ có thể Chuyển trạng thái Đang làm/Nghỉ làm.</span>
             </div>
+            <?php if (currentRole() === AppRole::ADMIN || currentRole() === AppRole::MANAGER): ?>
             <button class="btn btn-success fw-bold" onclick="openAddModal()">
                 <i class="fa-solid fa-user-plus me-1"></i> Thêm Tài Khoản Mới
             </button>
+            <?php endif; ?>
         </div>
 
         <!-- Bảng hiển thị -->
@@ -22,11 +24,11 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
                     <thead class="table-dark">
                         <tr>
                             <th width="80">ID</th>
-                            <th class="text-start">Họ tên nhân viên</th>
-                            <th class="text-start">Email đăng nhập</th>
+                            <th class="text-start">Họ tên & Email</th>
                             <th>Vai trò (Role)</th>
-                            <th>Trạng thái</th>
-                            <th width="180">Thao tác</th>
+                            <th>Trạng thái Nhân sự</th>
+                            <th>Trạng thái Hệ thống</th>
+                            <th width="150">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="accountsTableBody">
@@ -50,27 +52,65 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
                 <div class="modal-body">
                     <input type="hidden" id="ac_account_id" name="account_id" value="0">
                     
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Họ và tên <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="ac_full_name" required placeholder="Nguyễn Văn A">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Email <span class="text-danger">*</span></label>
-                        <input type="email" class="form-control" id="ac_email" required placeholder="nv.a@eldercoffee.com">
+                    <!-- PHẦN THÔNG TIN CÁ NHÂN (Manager kiểm soát) -->
+                    <div id="sectionPersonal">
+                        <div class="row g-2">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label fw-bold">Họ và tên <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="ac_full_name" required placeholder="Nguyễn Văn A">
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label fw-bold">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="ac_email" required placeholder="nv@eldercoffee.com">
+                            </div>
+                        </div>
+
+                        <div class="row g-2">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label fw-bold">Số điện thoại</label>
+                                <input type="text" class="form-control" id="ac_phone" placeholder="090...">
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label fw-bold">Ngày sinh</label>
+                                <input type="date" class="form-control" id="ac_birth_date">
+                            </div>
+                        </div>
+
+                        <div class="row g-2">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label fw-bold">Giới tính</label>
+                                <select class="form-select" id="ac_gender">
+                                    <option value="nam">Nam</option>
+                                    <option value="nữ">Nữ</option>
+                                    <option value="khác">Khác</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label fw-bold">Ngày vào làm</label>
+                                <input type="date" class="form-control" id="ac_hire_date">
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Địa chỉ</label>
+                            <textarea class="form-control" id="ac_address" rows="2" placeholder="Số nhà, đường..."></textarea>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Phân quyền (Role) <span class="text-danger">*</span></label>
-                        <select class="form-select" id="ac_role_id" required>
-                            <!-- Options rendered by JS -->
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Mật khẩu <span id="pwdAsterisk" class="text-danger">*</span></label>
-                        <input type="password" class="form-control" id="ac_password" placeholder="Nhập mật khẩu">
-                        <div class="form-text" id="ac_password_help">Để trống nếu không muốn đổi mật khẩu.</div>
+                    <!-- PHẦN PHÂN QUYỀN VÀ TÀI KHOẢN (Admin kiểm soát) -->
+                    <div id="sectionAccount">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Phân quyền (Role) <span class="text-danger">*</span></label>
+                            <select class="form-select" id="ac_role_id" required>
+                                <!-- Rendered by JS -->
+                            </select>
+                        </div>
+    
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Mật khẩu <span id="pwdAsterisk" class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="ac_password" placeholder="Nhập mật khẩu">
+                            <div class="form-text" id="ac_password_help">Để trống nếu không muốn đổi mật khẩu.</div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -95,6 +135,7 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
             <div class="modal-body text-center py-4">
                 <p class="mb-0" id="toggleStatusMsg">Bạn có chắc chắn muốn thay đổi trạng thái?</p>
                 <input type="hidden" id="toggle_account_id">
+                <input type="hidden" id="toggle_target">
                 <input type="hidden" id="toggle_new_status">
             </div>
             <div class="modal-footer justify-content-center border-0 pt-0">
@@ -110,17 +151,24 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
 let accountsData = [];
 let rolesData = [];
 const currentUserId = <?= currentUserId() ?>;
+const currentRole = '<?= currentRole() ?>';
 
 const modalAccount = new bootstrap.Modal(document.getElementById('modalAccount'));
 const modalToggle = new bootstrap.Modal(document.getElementById('modalToggleStatus'));
 const apiUrl = 'api/admin/accounts.php';
 
 // Format status badge
-function renderStatus(status) {
-    if (status === 'active') {
-        return `<span class="badge text-bg-success py-2 w-100"><i class="fa-solid fa-user-check me-1"></i> Đang làm</span>`;
-    }
-    return `<span class="badge text-bg-secondary py-2 w-100"><i class="fa-solid fa-user-xmark me-1"></i> Nghỉ làm</span>`;
+function renderHrStatus(status) {
+    if (status === 'active') return `<span class="badge text-bg-success py-1"><i class="fa-solid fa-briefcase"></i> Đang làm</span>`;
+    if (status === 'on_leave') return `<span class="badge text-bg-warning py-1"><i class="fa-solid fa-plane"></i> Nghỉ phép</span>`;
+    return `<span class="badge text-bg-secondary py-1"><i class="fa-solid fa-door-open"></i> Đã nghỉ việc</span>`;
+}
+
+function renderSystemStatus(status) {
+    if (status === 'active') return `<span class="badge text-bg-success py-1"><i class="fa-solid fa-check"></i> Hoạt động</span>`;
+    if (status === 'pending') return `<span class="badge text-bg-info py-1 text-white"><i class="fa-solid fa-clock"></i> Chờ kích hoạt</span>`;
+    if (status === 'locked') return `<span class="badge text-bg-danger py-1"><i class="fa-solid fa-lock"></i> Bị Khóa</span>`;
+    return `<span class="badge text-bg-dark py-1"><i class="fa-solid fa-ban"></i> Vô hiệu hóa</span>`;
 }
 
 // Load danh sách
@@ -156,31 +204,54 @@ function renderTable() {
         // Nút Sửa
         let editBtn = '';
         if (parseInt(acc.account_id) !== currentUserId) {
-            editBtn = `<button class="btn btn-sm btn-outline-primary me-1" title="Sửa thông tin" onclick="openEditModal(${acc.account_id})"><i class="fa-solid fa-pen"></i></button>`;
+            editBtn = `<button class="btn btn-sm btn-outline-primary" title="Sửa thông tin" onclick="openEditModal(${acc.account_id})"><i class="fa-solid fa-pen"></i></button>`;
         } else {
-            editBtn = `<button class="btn btn-sm btn-secondary me-1 disabled" title="Không thể sửa tài khoản đang đăng nhập" disabled><i class="fa-solid fa-pen"></i></button>`;
+            editBtn = `<button class="btn btn-sm btn-secondary disabled" title="Không thể sửa tài khoản đang đăng nhập" disabled><i class="fa-solid fa-pen"></i></button>`;
         }
         
-        // Nút Toggle Status
-        let toggleBtn = '';
-        if (parseInt(acc.account_id) !== currentUserId) {
-            const nextStatus = (acc.status === 'active') ? 'inactive' : 'active';
-            const icon = acc.status === 'active' ? 'fa-toggle-on text-success' : 'fa-toggle-off text-secondary';
-            const title = acc.status === 'active' ? 'Đánh dấu Nghỉ làm' : 'Đánh dấu Đang làm';
-            toggleBtn = `<button class="btn btn-sm btn-light border" title="${title}" onclick="promptToggle(${acc.account_id}, '${acc.status}', '${acc.full_name}')"><i class="fa-solid ${icon} fs-5 align-middle"></i></button>`;
-        } else {
-            toggleBtn = `<button class="btn btn-sm btn-light border disabled" title="Không thể tự khóa mình"><i class="fa-solid fa-toggle-on text-success fs-5 align-middle opacity-50"></i></button>`;
+        let hrToggleBtn = '';
+        let sysToggleBtn = '';
+
+        if (currentRole === 'manager') {
+            const nextHrStatus = (acc.hr_status === 'active') ? 'resigned' : 'active';
+            const hrIcon = acc.hr_status === 'active' ? 'fa-toggle-on text-success' : 'fa-toggle-off text-muted';
+            hrToggleBtn = `<button class="btn btn-sm btn-light border px-2" title="Đổi trạng thái HR" onclick="promptToggle(${acc.account_id}, 'hr', '${acc.hr_status}', '${acc.full_name}', '${acc.role_name}')"><i class="fa-solid ${hrIcon} fs-5 align-middle"></i></button>`;
+        } else if (currentRole === 'admin') {
+            hrToggleBtn = `<button class="btn btn-sm btn-light border px-2 disabled" title="Admin không được đổi trạng thái nhân sự" disabled><i class="fa-solid fa-user-lock text-secondary fs-5 align-middle"></i></button>`;
+        }
+
+        if (currentRole === 'admin') {
+            if (acc.role_name === 'admin' && parseInt(acc.account_id) !== currentUserId) {
+                // Admin can't block other admins
+                sysToggleBtn = `<button class="btn btn-sm btn-light border px-2 disabled" title="Không thể khóa Admin khác"><i class="fa-solid fa-shield text-secondary fs-5 align-middle"></i></button>`;
+            } else if (parseInt(acc.account_id) === currentUserId) {
+                sysToggleBtn = `<button class="btn btn-sm btn-light border px-2 disabled" title="Không thể tự khóa mình"><i class="fa-solid fa-shield text-secondary fs-5 align-middle opacity-50"></i></button>`;
+            } else {
+                if (acc.system_status === 'pending') {
+                    sysToggleBtn = `<button class="btn btn-sm btn-primary fw-bold px-2" title="Duyệt tài khoản" onclick="promptToggle(${acc.account_id}, 'system', 'pending', '${acc.full_name}', '${acc.role_name}')">Duyệt</button>`;
+                } else {
+                    const sysIcon = acc.system_status === 'active' ? 'fa-toggle-on text-success' : 'fa-toggle-off text-danger';
+                    sysToggleBtn = `<button class="btn btn-sm btn-light border px-2" title="Đổi trạng thái Hệ thống" onclick="promptToggle(${acc.account_id}, 'system', '${acc.system_status}', '${acc.full_name}', '${acc.role_name}')"><i class="fa-solid ${sysIcon} fs-5 align-middle"></i></button>`;
+                }
+            }
         }
 
         const roleLabelUI = `<span class="fw-medium">${acc.role_name}</span>`;
 
         tr.innerHTML = `
             <td class="fw-bold text-muted">#${acc.account_id}</td>
-            <td class="text-start fw-bold text-dark">${acc.full_name}</td>
-            <td class="text-start">${acc.email}</td>
+            <td class="text-start">
+                <div class="fw-bold text-dark">${acc.full_name}</div>
+                <small class="text-muted">${acc.email}</small>
+            </td>
             <td>${roleLabelUI}</td>
-            <td style="width: 140px;">${renderStatus(acc.status)}</td>
-            <td>${editBtn} ${toggleBtn}</td>
+            <td>${renderHrStatus(acc.hr_status)}</td>
+            <td>${renderSystemStatus(acc.system_status)}</td>
+            <td>
+                <div class="d-flex align-items-center justify-content-center gap-1">
+                    ${editBtn} ${hrToggleBtn} ${sysToggleBtn}
+                </div>
+            </td>
         `;
         tbody.appendChild(tr);
     });
@@ -201,12 +272,16 @@ function renderRolesOptions() {
 function openAddModal() {
     document.getElementById('formAccount').reset();
     document.getElementById('ac_account_id').value = 0;
-    document.getElementById('modalAccountTitle').innerText = 'Thêm Tài Khoản Mới';
-    
+    // Hiện cả 2 phần khi thêm mới
+    document.getElementById('sectionPersonal').style.display = 'block';
+    document.getElementById('sectionAccount').style.display = 'block';
+
     // Yêu cầu nhập mật khẩu khi tạo mới
     document.getElementById('ac_password').required = true;
     document.getElementById('pwdAsterisk').style.display = 'inline';
     document.getElementById('ac_password_help').style.display = 'none';
+    document.getElementById('ac_role_id').disabled = false;
+    document.getElementById('ac_email').disabled = false;
 
     modalAccount.show();
 }
@@ -216,17 +291,35 @@ function openEditModal(id) {
     if (!acc) return;
 
     document.getElementById('formAccount').reset();
-    document.getElementById('ac_account_id').value = acc.account_id;
     document.getElementById('ac_full_name').value = acc.full_name;
     document.getElementById('ac_email').value = acc.email;
     document.getElementById('ac_role_id').value = acc.role_id;
+    document.getElementById('ac_phone').value = acc.phone || '';
+    document.getElementById('ac_birth_date').value = acc.birth_date || '';
+    document.getElementById('ac_gender').value = acc.gender || 'nam';
+    document.getElementById('ac_hire_date').value = acc.hire_date || '';
+    document.getElementById('ac_address').value = acc.address || '';
     
-    document.getElementById('modalAccountTitle').innerText = 'Sửa Thông Tin Tài Khoản: ' + acc.full_name;
+    document.getElementById('modalAccountTitle').innerText = (currentRole === 'admin') ? 'Quản lý phân quyền: ' + acc.full_name : 'Cập Nhật Thông Tin: ' + acc.full_name;
     
     // Mật khẩu không bắt buộc khi sửa
     document.getElementById('ac_password').required = false;
     document.getElementById('pwdAsterisk').style.display = 'none';
     document.getElementById('ac_password_help').style.display = 'block';
+    
+    // Logic tách biệt: Manager sửa cá nhân, Admin sửa Role
+    if (currentRole === 'admin') {
+        document.getElementById('sectionPersonal').style.display = 'none';
+        document.getElementById('sectionAccount').style.display = 'block';
+        document.getElementById('ac_role_id').disabled = false;
+    } else {
+        document.getElementById('sectionPersonal').style.display = 'block';
+        document.getElementById('sectionAccount').style.display = 'none';
+        document.getElementById('ac_role_id').disabled = true;
+    }
+
+    // Email không cho đổi khi sửa
+    document.getElementById('ac_email').disabled = true;
 
     modalAccount.show();
 }
@@ -243,7 +336,12 @@ async function saveAccount(e) {
         full_name: document.getElementById('ac_full_name').value,
         email: document.getElementById('ac_email').value,
         role_id: document.getElementById('ac_role_id').value,
-        password: document.getElementById('ac_password').value
+        password: document.getElementById('ac_password').value,
+        phone: document.getElementById('ac_phone').value,
+        birth_date: document.getElementById('ac_birth_date').value,
+        gender: document.getElementById('ac_gender').value,
+        hire_date: document.getElementById('ac_hire_date').value,
+        address: document.getElementById('ac_address').value
     };
 
     const method = id > 0 ? 'PUT' : 'POST';
@@ -271,23 +369,43 @@ async function saveAccount(e) {
 }
 
 // Logic đổi trạng thái
-function promptToggle(id, currentStatus, name) {
-    const nextText = currentStatus === 'active' ? 'Ngừng hoạt động' : 'Kích hoạt lại làm việc';
-    document.getElementById('toggleStatusMsg').innerHTML = `Đổi trạng thái tài khoản <b>${name}</b> thành <b>${nextText}</b>?`;
+function promptToggle(id, target, currentStatus, name, role_name) {
     document.getElementById('toggle_account_id').value = id;
-    document.getElementById('toggle_new_status').value = currentStatus === 'active' ? 'inactive' : 'active';
+    document.getElementById('toggle_target').value = target;
+
+    let nextStatus = '';
+    let msg = '';
+    if (target === 'hr') {
+        nextStatus = currentStatus === 'active' ? 'resigned' : 'active';
+        msg = `Đổi trạng thái nhân sự của <b>${name}</b> thành <b>${nextStatus === 'resigned' ? 'Nghỉ việc' : 'Đang làm'}</b>?`;
+        if (nextStatus === 'resigned' && role_name !== 'admin') {
+            msg += `<br><small class="text-danger mt-2 d-block"><i class="fa-solid fa-circle-exclamation"></i> Tài khoản nội bộ này sẽ bị khóa quyền truy cập hệ thống tự động.</small>`;
+        }
+    } else {
+        if (currentStatus === 'pending') {
+            nextStatus = 'active';
+            msg = `Kích hoạt và cho phép tài khoản <b>${name}</b> truy cập hệ thống?`;
+        } else {
+            nextStatus = currentStatus === 'active' ? 'locked' : 'active';
+            msg = `Đổi trạng thái Hệ Thống của <b>${name}</b> thành <b>${nextStatus === 'locked' ? 'Khóa' : 'Kích hoạt'}</b>?`;
+        }
+    }
+
+    document.getElementById('toggleStatusMsg').innerHTML = msg;
+    document.getElementById('toggle_new_status').value = nextStatus;
     modalToggle.show();
 }
 
 async function executeToggle() {
     const id = document.getElementById('toggle_account_id').value;
+    const target = document.getElementById('toggle_target').value;
     const nextStatus = document.getElementById('toggle_new_status').value;
 
     try {
         const res = await fetch(apiUrl, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ account_id: id, status: nextStatus })
+            body: JSON.stringify({ account_id: id, target: target, status: nextStatus })
         });
         const result = await res.json();
         

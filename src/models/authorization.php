@@ -27,6 +27,7 @@ function getRolePermissions(): array
             AppPermission::VIEW_DASHBOARD,
             AppPermission::MANAGE_CATALOG,
             AppPermission::VIEW_REPORTS,
+            AppPermission::MANAGE_STAFF,
             AppPermission::MANAGE_ACCOUNTS,
         ],
         AppRole::MANAGER => [
@@ -37,6 +38,7 @@ function getRolePermissions(): array
             AppPermission::MANAGE_CUSTOMERS,
             AppPermission::VIEW_REPORTS,
             AppPermission::MANAGE_STAFF,
+            AppPermission::MANAGE_ACCOUNTS,
         ],
         AppRole::SALES => [
             AppPermission::VIEW_DASHBOARD,
@@ -55,7 +57,7 @@ function roleLabel(string $roleName): string
 {
     $labels = [
         AppRole::ADMIN     => 'Quản trị viên',
-        AppRole::MANAGER   => 'Quản lý',
+        AppRole::MANAGER   => 'Quản lý nhân sự',
         AppRole::SALES     => 'Nhân viên bán hàng',
         AppRole::WAREHOUSE => 'Nhân viên kho',
     ];

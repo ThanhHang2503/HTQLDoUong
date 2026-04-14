@@ -12,6 +12,7 @@ if ($current_role === AppRole::ADMIN) {
    if (!isset($_GET['profile']) && !isset($_GET['nhansu']) && !isset($_GET['thongke'])
        && !isset($_GET['baocao_kinhdoanh']) && !isset($_GET['baocao_kho']) 
        && !isset($_GET['baocao_nhansu']) && !isset($_GET['luong_ca_nhan'])
+       && !isset($_GET['chucvu']) && !isset($_GET['bangluong'])
        && !isset($_GET['dashboard'])) {
           header('location:admin/index.php');
           exit;
@@ -23,7 +24,7 @@ $user_id = currentUserId();
 $sql = "SELECT a.full_name, r.name AS role_name
         FROM accounts a
         JOIN roles r ON r.id = a.role_id
-        WHERE a.account_id = '$user_id' AND a.status = 'active'";
+        WHERE a.account_id = '$user_id' AND a.system_status = 'active'";
 $result = mysqli_query($conn, $sql);
 $row = mysqli_fetch_assoc($result);
 
@@ -36,6 +37,29 @@ if (!$row) {
 
 $user_name = $row['full_name'];
 $_SESSION['role_name'] = $row['role_name'];
+
+// API lịch sử chức vụ (JSON) - Phải xử lý TRƯỚC khi có bất kỳ HTML output nào
+if (isset($_GET['chucvu_history_api'])) {
+   requireLogin();
+   $acc_id = (int)($_GET['account_id'] ?? 0);
+   if ($acc_id > 0) {
+       $hr = mysqli_query($conn, "SELECT eph.start_date, eph.end_date, p.position_name, eph.reason
+           FROM employee_positions_history eph
+           JOIN positions p ON p.position_id = eph.position_id
+           WHERE eph.account_id = $acc_id ORDER BY eph.start_date DESC");
+       $hist = $hr ? mysqli_fetch_all($hr, MYSQLI_ASSOC) : [];
+   } else { $hist = []; }
+   header('Content-Type: application/json; charset=utf-8');
+   echo json_encode($hist);
+   exit;
+}
+
+// Xử lý IN BẢNG LƯƠNG (Phải chạy TRƯỚC khi render layout để bản in sạch)
+if (isset($_GET['bangluong']) && isset($_GET['print'])) {
+   requireLogin();
+   require_once __DIR__ . '/src/views/bangluong.php';
+   exit;
+}
 
 require_once __DIR__ . '/src/views/layout.php';
 renderAppLayoutStart($user_name, $current_role);
@@ -526,21 +550,6 @@ if (isset($_GET['chucvu'])) {
    require_once __DIR__ . '/src/views/chucvu.php';
 }
 
-// API lịch sử chức vụ (JSON)
-if (isset($_GET['chucvu_history_api'])) {
-   requireLogin();
-   $acc_id = (int)($_GET['account_id'] ?? 0);
-   if ($acc_id > 0) {
-       $hr = mysqli_query($conn, "SELECT eph.start_date, eph.end_date, p.position_name, eph.reason
-           FROM employee_positions_history eph
-           JOIN positions p ON p.position_id = eph.position_id
-           WHERE eph.account_id = $acc_id ORDER BY eph.start_date DESC");
-       $hist = $hr ? mysqli_fetch_all($hr, MYSQLI_ASSOC) : [];
-   } else { $hist = []; }
-   header('Content-Type: application/json; charset=utf-8');
-   echo json_encode($hist);
-   exit;
-}
 
 // Bảng lương (Manager quản lý)
 if (isset($_GET['bangluong'])) {

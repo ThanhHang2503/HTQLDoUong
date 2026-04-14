@@ -181,7 +181,9 @@ $pos_history = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
                         <table class="table table-sm">
                             <tr><th style="width:50%">Vai trò hệ thống</th><td><?= htmlspecialchars($profile['role_display'] ?? '-') ?></td></tr>
                             <tr><th>Chức vụ hiện tại</th><td><?= htmlspecialchars($profile['position_name'] ?? 'Chưa phân công') ?></td></tr>
+                            <?php if (currentRole() !== AppRole::ADMIN): ?>
                             <tr><th>Lương cơ bản</th><td class="text-success fw-bold"><?= $profile['base_salary'] ? number_format($profile['base_salary'],0,',','.') . ' VND' : '-' ?></td></tr>
+                            <?php endif; ?>
                             <tr><th>Tham gia từ</th><td><?= $profile['hire_date'] ? date('d/m/Y', strtotime($profile['hire_date'])) : 'N/A' ?></td></tr>
                             <tr><th>ID Tài khoản</th><td>#<?= $profile['account_id'] ?></td></tr>
                         </table>
@@ -189,6 +191,7 @@ $pos_history = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
                 </div>
 
                 <!-- Lịch sử chức vụ -->
+                <?php if (currentRole() !== AppRole::ADMIN): ?>
                 <div class="card shadow-sm mt-3">
                     <div class="card-header fw-bold">
                         <i class="fa-solid fa-clock-rotate-left me-2"></i>Lịch Sử Chức Vụ
@@ -212,6 +215,7 @@ $pos_history = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

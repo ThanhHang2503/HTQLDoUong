@@ -7,25 +7,31 @@ require_once __DIR__ . '/src/models/authorization.php';
 if (isset($_POST['submit'])) {
    $email = mysqli_real_escape_string($conn, $_POST['email']);
    $pass = md5($_POST['password']);
-   $select = "SELECT a.account_id, a.full_name, r.name AS role_name
+   $select = "SELECT a.account_id, a.full_name, r.name AS role_name, a.system_status
               FROM accounts a
               JOIN roles r ON r.id = a.role_id
-              WHERE a.email = '$email' AND a.password = '$pass' AND a.status = 'active'";
+              WHERE a.email = '$email' AND a.password = '$pass'";
 
    $result = mysqli_query($conn, $select);
    if (mysqli_num_rows($result) > 0) {
-
       $row = mysqli_fetch_array($result);
-      session_unset();
-      $_SESSION['account_id'] = (int) $row['account_id'];
-      $_SESSION['role_name'] = $row['role_name'];
-      $_SESSION['full_name'] = $row['full_name'];
-      if ($row['role_name'] === AppRole::ADMIN) {
-         header('location:admin/index.php');
+
+      if ($row['system_status'] === 'pending') {
+         $error[] = 'Tài khoản chưa được kích hoạt. Vui lòng chờ Admin phê duyệt!';
+      } else if ($row['system_status'] !== 'active') {
+         $error[] = 'Tài khoản của bạn đã bị khóa hoặc vô hiệu hóa!';
       } else {
-         header('location:user_page.php?home');
+         session_unset();
+         $_SESSION['account_id'] = (int) $row['account_id'];
+         $_SESSION['role_name'] = $row['role_name'];
+         $_SESSION['full_name'] = $row['full_name'];
+         if ($row['role_name'] === AppRole::ADMIN) {
+            header('location:admin/index.php');
+         } else {
+            header('location:user_page.php?home');
+         }
+         exit;
       }
-      exit;
    } else {
       $error[] = 'Sai email hoặc mật khẩu!';
    }
