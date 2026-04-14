@@ -3,19 +3,21 @@
 global $conn;
 
 $sel_year  = (int)($_GET['year']  ?? date('Y'));
-$sel_month = (int)($_GET['month'] ?? 0);
+$sel_month = (int)($_GET['month'] ?? date('n')); // Mặc định: tháng hiện tại
 
 $where_salary = "WHERE sr.salary_year = $sel_year" . ($sel_month > 0 ? " AND sr.salary_month = $sel_month" : '');
 $where_leave  = "WHERE YEAR(lr.from_date) = $sel_year" . ($sel_month > 0 ? " AND MONTH(lr.from_date) = $sel_month" : '');
 
-// 1. Tổng quỹ lương
+// 1. Tổng quỹ lương (loại trừ admin role_id=1)
 $wage_sql = "SELECT COUNT(DISTINCT sr.account_id) AS paid_count,
     SUM(sr.base_salary) AS total_base,
     SUM(sr.allowance) AS total_allow,
     SUM(sr.bonus) AS total_bonus,
     SUM(sr.deductions) AS total_deduct,
     SUM(sr.total_salary) AS total_pay
-  FROM salary_records sr $where_salary";
+  FROM salary_records sr
+  JOIN accounts a ON a.account_id = sr.account_id AND a.role_id != 1
+  $where_salary";
 $wage_r = mysqli_query($conn, $wage_sql);
 $wage_summary = $wage_r ? mysqli_fetch_assoc($wage_r) : [];
 
@@ -35,9 +37,11 @@ $total_emp = $total_active + $total_inactive;
 $emp_pos_r = mysqli_query($conn, "SELECT p.position_name, COUNT(a.account_id) as c FROM accounts a LEFT JOIN positions p ON a.position_id = p.position_id WHERE a.hr_status='active' AND a.role_id!=1 GROUP BY p.position_name ORDER BY c DESC");
 $emp_by_pos = $emp_pos_r ? mysqli_fetch_all($emp_pos_r, MYSQLI_ASSOC) : [];
 
-// 3. Lương từng tháng trong năm (chart)
+// 3. Lương từng tháng trong năm (chart - loại trừ admin)
 $monthly_wage = "SELECT sr.salary_month AS thang, SUM(sr.total_salary) AS tong_luong, SUM(sr.bonus) AS tong_thuong
-                 FROM salary_records sr WHERE sr.salary_year=$sel_year
+                 FROM salary_records sr
+                 JOIN accounts a ON a.account_id = sr.account_id AND a.role_id != 1
+                 WHERE sr.salary_year=$sel_year
                  GROUP BY sr.salary_month ORDER BY thang";
 $mw_r = mysqli_query($conn, $monthly_wage);
 $monthly_wages = $mw_r ? mysqli_fetch_all($mw_r, MYSQLI_ASSOC) : [];
@@ -79,11 +83,11 @@ $lbe_r = mysqli_query($conn, $leave_by_emp);
 $leave_by_emp_data = $lbe_r ? mysqli_fetch_all($lbe_r, MYSQLI_ASSOC) : [];
 $most_leave_emp = !empty($leave_by_emp_data) && $leave_by_emp_data[0]['ngay_nghi_phep'] > 0 ? $leave_by_emp_data[0] : null;
 
-// 6. Chi tiết lương theo NV từng tháng
+// 6. Chi tiết lương theo NV từng tháng (loại trừ admin)
 $detail_sql = "SELECT sr.salary_month, a.full_name, p.position_name,
     sr.base_salary, sr.allowance, sr.bonus, sr.deductions, sr.total_salary
   FROM salary_records sr
-  JOIN accounts a ON a.account_id=sr.account_id
+  JOIN accounts a ON a.account_id=sr.account_id AND a.role_id != 1
   JOIN positions p ON p.position_id=sr.position_id
   $where_salary
   ORDER BY sr.salary_month, a.full_name";
@@ -113,7 +117,7 @@ foreach ($monthly_wages as $mw) {
         <div class="col-md-2">
             <label class="form-label">Tháng (0=cả năm)</label>
             <select class="form-select" name="month">
-                <option value="0">Cả năm</option>
+                <option value="0" <?=0==$sel_month?'selected':''?>>Cả năm</option>
                 <?php for ($m=1;$m<=12;$m++): ?>
                 <option value="<?=$m?>" <?=$m==$sel_month?'selected':''?>>Tháng <?=$m?></option>
                 <?php endfor; ?>
@@ -253,7 +257,7 @@ foreach ($monthly_wages as $mw) {
         <div class="col-lg-8">
             <div class="card shadow-sm h-100">
                 <div class="card-header fw-bold text-bg-dark"><i class="fa-solid fa-table me-2"></i>Sổ Sách Bảng Lương Chi Tiết
-                    <?= $sel_month > 0 ? "Tháng $sel_month/$sel_year" : "Năm $sel_year" ?>
+                    <?= $sel_month > 0 ? "— Tháng $sel_month/$sel_year" : "— Năm $sel_year" ?>
                 </div>
                 <div class="card-body p-0" style="max-height:400px;overflow-y:auto">
                     <?php if (empty($salary_detail)): ?>

@@ -199,13 +199,13 @@ if ($emp_result) {
     }
 }
 
-// Bản ghi lương tháng đã chọn (dùng view)
+// Bản ghi lương tháng đã chọn (loại trừ admin role_id=1)
 $salary_sql = "SELECT sr.salary_record_id, sr.account_id, sr.salary_month, sr.salary_year,
                       sr.base_salary, sr.allowance, sr.bonus, sr.deductions, sr.total_salary,
                       sr.notes, sr.updated_at,
                       a.full_name, r.display_name AS role_name, p.position_name
                FROM salary_records sr
-               JOIN accounts a ON a.account_id = sr.account_id
+               JOIN accounts a ON a.account_id = sr.account_id AND a.role_id != 1
                JOIN roles r ON r.id = a.role_id
                JOIN positions p ON p.position_id = sr.position_id
                WHERE sr.salary_month = $sel_month AND sr.salary_year = $sel_year
