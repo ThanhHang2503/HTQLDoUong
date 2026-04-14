@@ -38,7 +38,7 @@ $user_name = $row['full_name'];
 $_SESSION['role_name'] = $row['role_name'];
 
 require_once __DIR__ . '/src/views/layout.php';
-renderAppLayoutStart($user_name);
+renderAppLayoutStart($user_name, $current_role);
 ?>
 
 <?php
@@ -590,5 +590,5 @@ if (isset($_GET['baocao_nhansu'])) {
 
 // (Đã xóa tính năng backup)
 
-renderAppLayoutEnd();
+renderAppLayoutEnd($current_role);
 ?>

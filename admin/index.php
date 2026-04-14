@@ -37,53 +37,10 @@ $supplierCount = adminCountValue($conn, 'SELECT COUNT(*) FROM suppliers');
 $activeProducts = adminCountValue($conn, "SELECT COUNT(*) FROM items WHERE item_status = 'active'");
 $activeSuppliers = adminCountValue($conn, "SELECT COUNT(*) FROM suppliers WHERE status = 'active'");
 
-?><!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin | ElderCoffee</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="assets/admin.css">
-</head>
-<body>
-    <div class="admin-shell">
-        <aside class="admin-sidebar">
-            <div class="brand-block">
-                <div class="brand-badge">EC</div>
-                <div>
-                    <div class="brand-title">ElderCoffee Admin</div>
-                    <div class="brand-subtitle"><?= adminText($_SESSION['full_name'] ?? 'Admin') ?></div>
-                </div>
-            </div>
+require_once __DIR__ . '/../src/views/layout.php';
+renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
+?>
 
-            <nav class="admin-nav">
-                <a class="<?= $view === 'products' ? 'active' : '' ?>" href="?view=products">
-                    <i class="fa-solid fa-mug-hot"></i> Sản phẩm
-                </a>
-                <a class="<?= $view === 'suppliers' ? 'active' : '' ?>" href="?view=suppliers">
-                    <i class="fa-solid fa-truck-fast"></i> Nhà cung cấp
-                </a>
-                <a href="../user_page.php?nhansu">
-                    <i class="fa-solid fa-users-gear"></i> Quản lý User
-                </a>
-                <a href="../user_page.php?baocao_kinhdoanh">
-                    <i class="fa-solid fa-chart-line"></i> BC Kinh doanh
-                </a>
-                <a href="../user_page.php?luong_ca_nhan">
-                    <i class="fa-solid fa-wallet"></i> Lương của tôi
-                </a>
-                <a href="../user_page.php?profile">
-                    <i class="fa-solid fa-user-pen"></i> Hồ sơ cá nhân
-                </a>
-                <a href="../logout.php">
-                    <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
-                </a>
-            </nav>
-        </aside>
-
-        <main class="admin-main">
             <header class="admin-hero card shadow-sm border-0 mb-4">
                 <div class="card-body d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-center">
                     <div>
@@ -152,7 +109,6 @@ $activeSuppliers = adminCountValue($conn, "SELECT COUNT(*) FROM suppliers WHERE 
                 );
                 ?>
             <?php endif; ?>
-        </main>
-    </div>
-</body>
-</html>
+<?php
+renderAppLayoutEnd('admin');
+?>

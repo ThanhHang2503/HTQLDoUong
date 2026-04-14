@@ -154,7 +154,12 @@ function renderTable() {
         const tr = document.createElement('tr');
         
         // Nút Sửa
-        const editBtn = `<button class="btn btn-sm btn-outline-primary me-1" title="Sửa thông tin" onclick="openEditModal(${acc.account_id})"><i class="fa-solid fa-pen"></i></button>`;
+        let editBtn = '';
+        if (parseInt(acc.account_id) !== currentUserId) {
+            editBtn = `<button class="btn btn-sm btn-outline-primary me-1" title="Sửa thông tin" onclick="openEditModal(${acc.account_id})"><i class="fa-solid fa-pen"></i></button>`;
+        } else {
+            editBtn = `<button class="btn btn-sm btn-secondary me-1 disabled" title="Không thể sửa tài khoản đang đăng nhập" disabled><i class="fa-solid fa-pen"></i></button>`;
+        }
         
         // Nút Toggle Status
         let toggleBtn = '';

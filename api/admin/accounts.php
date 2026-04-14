@@ -80,6 +80,11 @@ try {
             exit;
         }
 
+        if ($account_id === currentUserId()) {
+            echo json_encode(['success' => false, 'message' => 'Bạn không thể tự sửa thông tin phân quyền của chính mình qua chức năng này']);
+            exit;
+        }
+
         // Check trùng email nhưng bỏ qua email của chính tài khoản này
         $check = mysqli_query($conn, "SELECT account_id FROM accounts WHERE email = '$email' AND account_id != $account_id");
         if (mysqli_num_rows($check) > 0) {

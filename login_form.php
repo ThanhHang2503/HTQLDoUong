@@ -42,34 +42,152 @@ if (isset($_POST['submit'])) {
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <link rel="shortcut icon" href="img/logo.jpg">
-   <title>Quản Lý Đồ Uống</title>
+   <title>Quản Lý Đồ Uống - Đăng Nhập</title>
+   
+   <!-- Google Fonts -->
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+   
    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
 
-   <!-- custom css file link  -->
-   <link rel="stylesheet" href="css/style.css">
-
+   <style>
+      body {
+         font-family: 'Inter', sans-serif;
+         background-color: #f8f9fa;
+         margin: 0;
+         padding: 0;
+      }
+      .split-layout {
+         min-height: 100vh;
+      }
+      .bg-image {
+         background-image: url('img/login_bg.png');
+         background-size: cover;
+         background-position: center;
+         background-repeat: no-repeat;
+         min-height: 250px; /* For mobile */
+      }
+      @media (min-width: 992px) {
+         .bg-image {
+            min-height: 100vh;
+         }
+      }
+      .form-wrapper {
+         width: 100%;
+         max-width: 450px;
+         padding: 2.5rem;
+      }
+      .form-title {
+         font-weight: 700;
+         color: #212529;
+         margin-bottom: 0.5rem;
+         font-size: 1.75rem;
+      }
+      .form-subtitle {
+         color: #6c757d;
+         font-size: 0.95rem;
+         margin-bottom: 2rem;
+      }
+      .input-group-custom {
+         margin-bottom: 1.5rem;
+      }
+      .input-group-custom label {
+         font-weight: 500;
+         color: #495057;
+         margin-bottom: 0.5rem;
+         display: block;
+      }
+      .input-group-custom input {
+         width: 100%;
+         padding: 0.8rem 1rem;
+         border: 1px solid #dee2e6;
+         border-radius: 8px;
+         font-size: 1rem;
+         transition: all 0.3s ease;
+      }
+      .input-group-custom input:focus {
+         border-color: #0d6efd;
+         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+         outline: none;
+      }
+      .btn-login {
+         width: 100%;
+         padding: 0.8rem;
+         font-weight: 600;
+         font-size: 1rem;
+         border-radius: 8px;
+         background-color: #0d6efd;
+         border: none;
+         color: white;
+         transition: all 0.3s ease;
+      }
+      .btn-login:hover {
+         background-color: #0b5ed7;
+         transform: translateY(-2px);
+         box-shadow: 0 4px 12px rgba(13, 110, 253, 0.2);
+      }
+      .error-alert {
+         background-color: #f8d7da;
+         color: #842029;
+         padding: 0.75rem 1rem;
+         border-radius: 8px;
+         margin-bottom: 1.5rem;
+         font-size: 0.9rem;
+         border: 1px solid #f5c2c7;
+      }
+      .logo-img {
+         width: 80px;
+         height: 80px;
+         border-radius: 50%;
+         object-fit: cover;
+         margin-bottom: 1.5rem;
+         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      }
+   </style>
 </head>
 
 <body>
 
-   <div class="background">
-      <div class="form-container">
-         <form action="" method="post">
-            <h1 class="fw-bolder ">ĐĂNG NHẬP</h1>
-            <img class="img-fluid" width="120px" style="border-radius:100%" src="img/logo.jpg" alt="">
-            <?php
-            if (isset($error)) {
-               foreach ($error as $error) {
-                  echo '<span class="bg-danger p-1 error-msg">' . $error . '</span>';
+   <div class="container-fluid p-0">
+      <div class="row g-0 split-layout">
+         <!-- Image Side -->
+         <div class="col-12 col-lg-6 bg-image order-1 order-lg-1"></div>
+         
+         <!-- Form Side -->
+         <div class="col-12 col-lg-6 d-flex align-items-center justify-content-center order-2 order-lg-2 bg-white p-3 p-md-0">
+            <div class="form-wrapper">
+               <div class="text-center">
+                  <img src="img/logo.jpg" alt="Logo" class="logo-img">
+                  <h2 class="form-title">ĐĂNG NHẬP</h2>
+                  <p class="form-subtitle">Vui lòng đăng nhập để tiếp tục</p>
+               </div>
+
+               <?php
+               if (isset($error)) {
+                  foreach ($error as $err) {
+                     echo '<div class="error-alert">' . htmlspecialchars($err) . '</div>';
+                  };
                };
-            };
+               ?>
 
-            ?>
-            <input type="email" name="email" required placeholder="Nhập vào mail của bạn">
-            <input type="password" name="password" required placeholder="Nhập vào password">
-            <input type="submit" name="submit" value="Đăng nhập" class="form-btn btn">
-         </form>
+               <form action="" method="post">
+                  <div class="input-group-custom">
+                     <label for="email">Địa chỉ Email</label>
+                     <input type="email" id="email" name="email" required placeholder="Nhập vào mail của bạn">
+                  </div>
+                  
+                  <div class="input-group-custom">
+                     <label for="password">Mật khẩu</label>
+                     <input type="password" id="password" name="password" required placeholder="Nhập vào password">
+                  </div>
 
+                  <button type="submit" name="submit" value="Đăng nhập" class="btn-login mt-2">
+                     Đăng nhập
+                  </button>
+               </form>
+            </div>
+         </div>
       </div>
    </div>
 
