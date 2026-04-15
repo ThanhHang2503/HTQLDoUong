@@ -3,8 +3,7 @@
 requirePermission(AppPermission::MANAGE_STAFF);
 global $conn;
 
-$msg_success = '';
-$msg_error   = '';
+
 
 // Thêm chức vụ
 if (isset($_POST['add_position'])) {
@@ -12,11 +11,12 @@ if (isset($_POST['add_position'])) {
     $salary  = (int)($_POST['base_salary'] ?? 0);
     $desc    = trim(mysqli_real_escape_string($conn, $_POST['description'] ?? ''));
     if ($name === '' || $salary <= 0) {
-        $msg_error = 'Tên chức vụ và lương cơ bản là bắt buộc.';
+        setNotify('error', 'Tên chức vụ và lương cơ bản là bắt buộc.');
     } else {
         mysqli_query($conn, "INSERT INTO positions (position_name, base_salary, description) VALUES ('$name', $salary, '$desc')");
-        $msg_success = "Đã thêm chức vụ '$name'.";
+        setNotify('success', "Đã thêm chức vụ '$name'.");
     }
+    header('Location: user_page.php?chucvu'); exit;
 }
 
 // Sửa chức vụ
@@ -29,8 +29,11 @@ if (isset($_POST['edit_position'])) {
     if ($pid > 0 && $name !== '' && $salary > 0) {
         mysqli_query($conn, "UPDATE positions SET position_name='$name', base_salary=$salary,
                               description='$desc', is_active=$active WHERE position_id=$pid");
-        $msg_success = 'Đã cập nhật chức vụ.';
+        setNotify('success', 'Đã cập nhật chức vụ.');
+    } else {
+        setNotify('error', 'Dữ liệu chức vụ không hợp lệ.');
     }
+    header('Location: user_page.php?chucvu'); exit;
 }
 
 // Đổi chức vụ nhân viên
@@ -39,34 +42,38 @@ if (isset($_POST['change_employee_position'])) {
     $new_pos = (int)($_POST['new_position_id'] ?? 0);
     $reason  = trim(mysqli_real_escape_string($conn, $_POST['change_reason'] ?? ''));
     $date    = trim($_POST['change_date'] ?? date('Y-m-d'));
-    if ($acc_id > 0 && $new_pos > 0) {
-        // Đóng chức vụ hiện tại
+    // Chặn gán chức vụ Quản trị viên (position_id=1) từ giao diện HR
+    if ($acc_id > 0 && $new_pos > 0 && $new_pos != 1) {
         mysqli_query($conn, "UPDATE employee_positions_history SET end_date='$date'
                               WHERE account_id=$acc_id AND end_date IS NULL");
-        // Tạo chức vụ mới
         mysqli_query($conn, "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason, created_by)
                               VALUES ($acc_id, $new_pos, '$date', '$reason', " . currentUserId() . ")");
-        // Cập nhật accounts
-        mysqli_query($conn, "UPDATE accounts SET position_id=$new_pos WHERE account_id=$acc_id");
-        $msg_success = 'Đã đổi chức vụ nhân viên thành công.';
+        mysqli_query($conn, "UPDATE accounts SET position_id=$new_pos, role_id=$new_pos WHERE account_id=$acc_id");
+        setNotify('success', 'Đã đổi chức vụ nhân viên thành công.');
+    } elseif ($new_pos == 1) {
+        setNotify('error', 'Không thể gán chức vụ Quản trị viên từ giao diện nhân sự.');
     }
+    header('Location: user_page.php?chucvu'); exit;
 }
 
-// Lấy danh sách chức vụ, loại bỏ position_id 4 (Quản trị viên)
+// Lấy danh sách chức vụ — loại bỏ position_id=1 (Quản trị viên, chỉ quản lý trong trang Admin)
 $positions_sql = "SELECT p.*, (SELECT COUNT(*) FROM accounts a WHERE a.position_id = p.position_id AND a.hr_status='active') AS employee_count
                   FROM positions p 
-                  WHERE p.position_id != 4
+                  WHERE p.position_id != 1
                   ORDER BY p.is_active DESC, p.base_salary DESC";
 $pos_result = mysqli_query($conn, $positions_sql);
 $positions = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
 
 // Lấy danh sách nhân viên để đổi chức vụ
+// Điều kiện: đang làm việc (active) + không phải admin (role_id != 1)
+// Không lọc theo position_id để tránh mất nhân viên chưa được gán chức vụ (NULL)
 $emp_sql = "SELECT a.account_id, a.full_name, r.display_name AS role_name,
-                   p.position_name AS current_position, p.position_id AS current_position_id
+                   p.position_name AS current_position, p.position_id AS current_position_id,
+                   p.base_salary AS current_base_salary
             FROM accounts a
             JOIN roles r ON r.id = a.role_id
             LEFT JOIN positions p ON p.position_id = a.position_id
-            WHERE a.hr_status = 'active' AND a.role_id != 1 AND a.position_id != 4
+            WHERE a.hr_status = 'active' AND a.role_id != 1
             ORDER BY a.full_name";
 $emp_result = mysqli_query($conn, $emp_sql);
 $employees = $emp_result ? mysqli_fetch_all($emp_result, MYSQLI_ASSOC) : [];
@@ -84,12 +91,7 @@ if ($edit_pos_id > 0) {
     <h1 class="head-name">QUẢN LÝ CHỨC VỤ</h1>
     <div class="head-line"></div>
 
-    <?php if ($msg_success): ?>
-        <div class="alert alert-success"><?= htmlspecialchars($msg_success) ?></div>
-    <?php endif; ?>
-    <?php if ($msg_error): ?>
-        <div class="alert alert-danger"><?= htmlspecialchars($msg_error) ?></div>
-    <?php endif; ?>
+
 
     <div class="container-fluid">
         <div class="row g-3 mt-1">
@@ -192,75 +194,74 @@ if ($edit_pos_id > 0) {
                 <div class="card shadow-sm">
                     <div class="card-header fw-bold"><i class="fa-solid fa-list me-2"></i>Danh Sách Chức Vụ</div>
                     <div class="card-body p-0">
-                        <table class="table table-striped table-hover table-bordered mb-0 text-center">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Mã</th>
-                                    <th>Tên chức vụ</th>
-                                    <th>Lương cơ bản</th>
-                                    <th>Số NV</th>
-                                    <th>Trạng thái</th>
-                                    <th>Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($positions as $pos): ?>
-                                <tr class="<?= !$pos['is_active'] ? 'table-secondary' : '' ?>">
-                                    <td>#<?= $pos['position_id'] ?></td>
-                                    <td class="text-start fw-bold"><?= htmlspecialchars($pos['position_name']) ?></td>
-                                    <td class="text-success fw-bold"><?= number_format($pos['base_salary'],0,',','.') ?> VND</td>
-                                    <td><span class="badge text-bg-primary"><?= $pos['employee_count'] ?> NV</span></td>
-                                    <td>
-                                        <span class="badge text-bg-<?= $pos['is_active'] ? 'success' : 'secondary' ?>">
-                                            <?= $pos['is_active'] ? 'Hoạt động' : 'Ngừng' ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <a href="user_page.php?chucvu&edit_id=<?= $pos['position_id'] ?>"
-                                           class="btn btn-sm btn-outline-primary">
-                                            <i class="fa-solid fa-pen"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                        <div style="max-height: 320px; overflow-y: auto;">
+                            <table class="table table-striped table-hover table-bordered mb-0 text-center">
+                                <thead class="table-dark" style="position: sticky; top: 0; z-index: 2;">
+                                    <tr>
+                                        <th>Mã</th>
+                                        <th>Tên chức vụ</th>
+                                        <th>Lương cơ bản</th>
+                                        <th>Số NV</th>
+                                        <th>Trạng thái</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($positions as $pos): ?>
+                                    <tr class="<?= !$pos['is_active'] ? 'table-secondary' : '' ?>">
+                                        <td>#<?= $pos['position_id'] ?></td>
+                                        <td class="text-start fw-bold"><?= htmlspecialchars($pos['position_name']) ?></td>
+                                        <td class="text-success fw-bold"><?= number_format($pos['base_salary'],0,',','.') ?> VND</td>
+                                        <td><span class="badge text-bg-primary"><?= $pos['employee_count'] ?> NV</span></td>
+                                        <td>
+                                            <span class="badge text-bg-<?= $pos['is_active'] ? 'success' : 'secondary' ?>">
+                                                <?= $pos['is_active'] ? 'Hoạt động' : 'Ngừng' ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="user_page.php?chucvu&edit_id=<?= $pos['position_id'] ?>"
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Bảng nhân viên + chức vụ hiện tại -->
                 <div class="card shadow-sm mt-3">
-                    <div class="card-header fw-bold"><i class="fa-solid fa-users me-2"></i>Nhân Viên & Chức Vụ Hiện Tại</div>
+                    <div class="card-header fw-bold"><i class="fa-solid fa-users me-2"></i>Nhân Viên &amp; Chức Vụ Hiện Tại
+                        <span class="badge text-bg-secondary ms-2"><?= count($employees) ?> nhân viên</span>
+                    </div>
                     <div class="card-body p-0">
-                        <table class="table table-sm table-striped table-bordered mb-0 text-center">
-                            <thead class="table-secondary">
-                                <tr><th>Nhân viên</th><th>Vai trò</th><th>Chức vụ hiện tại</th><th>Lương cơ bản</th><th>Lịch sử</th></tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($employees as $emp): ?>
-                                <tr>
-                                    <td class="text-start fw-bold"><?= htmlspecialchars($emp['full_name']) ?></td>
-                                    <td><?= htmlspecialchars($emp['role_name']) ?></td>
-                                    <td><?= htmlspecialchars($emp['current_position'] ?? '<span class="text-muted">Chưa phân công</span>') ?></td>
-                                    <td>
-                                        <?php
-                                        if ($emp['current_position_id']) {
-                                            $ps = array_filter($positions, fn($p)=>$p['position_id']==$emp['current_position_id']);
-                                            $ps = array_values($ps);
-                                            echo $ps ? number_format($ps[0]['base_salary'],0,',','.') . ' VND' : '-';
-                                        } else echo '-';
-                                        ?>
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-xs btn-outline-info btn-sm"
-                                                onclick="viewHistory(<?= $emp['account_id'] ?>, '<?= htmlspecialchars($emp['full_name'], ENT_QUOTES) ?>')">
-                                            <i class="fa-solid fa-clock-rotate-left"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                        <div style="max-height: 420px; overflow-y: auto;">
+                            <table class="table table-sm table-striped table-bordered mb-0 text-center">
+                                <thead class="table-secondary" style="position: sticky; top: 0; z-index: 2;">
+                                    <tr><th>Nhân viên</th><th>Chức vụ hiện tại</th><th>Lương cơ bản</th><th>Lịch sử</th></tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($employees as $emp): ?>
+                                    <tr>
+                                        <td class="text-start fw-bold"><?= htmlspecialchars($emp['full_name']) ?></td>
+                                        <td><?= htmlspecialchars($emp['current_position'] ?? '<span class="text-muted">Chưa phân công</span>') ?></td>
+                                        <td class="text-success fw-bold">
+                                            <?= $emp['current_base_salary'] ? number_format($emp['current_base_salary'], 0, ',', '.') . ' VND' : '<span class="text-muted">-</span>' ?>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-xs btn-outline-info btn-sm"
+                                                    onclick="viewHistory(<?= $emp['account_id'] ?>, '<?= htmlspecialchars($emp['full_name'], ENT_QUOTES) ?>')">
+                                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -302,10 +303,10 @@ function viewHistory(accId, name) {
     fetch('user_page.php?chucvu_history_api=1&account_id=' + accId)
         .then(r => r.json())
         .then(data => {
-            let html = '<table class="table table-sm table-striped"><thead><tr><th>Chức vụ</th><th>Từ ngày</th><th>Đến ngày</th><th>Lý do</th></tr></thead><tbody>';
+            let html = '<table class="table table-sm table-striped"><thead><tr><th>Chức vụ</th><th>Từ ngày</th><th>Đến ngày</th></tr></thead><tbody>';
             if (data && data.length > 0) {
                 data.forEach(h => {
-                    html += `<tr><td>${h.position_name}</td><td>${h.start_date}</td><td>${h.end_date||'<span class="badge bg-success">Hiện tại</span>'}</td><td>${h.reason||'-'}</td></tr>`;
+                    html += `<tr><td>${h.position_name}</td><td>${h.start_date}</td><td>${h.end_date||'<span class="badge bg-success">Hiện tại</span>'}</td></tr>`;
                 });
                 html += '</tbody></table>';
             } else {

@@ -1,6 +1,34 @@
 <?php
 require_once __DIR__ . '/authorization.php';
 
+/**
+ * Sinh data-* attributes để gắn vào thẻ <body> hoặc page container.
+ * JS trong layout_end sẽ đọc và tự động hiển thị modal thông báo.
+ *
+ * @param string $type    'success' | 'error' | 'warning' | 'info'
+ * @param string $message Nội dung thông báo
+ * @param string $title   Tiêu đề (để trống = dùng default theo type)
+ */
+function notifyAttrs(string $type, string $message, string $title = ''): string
+{
+    if ($message === '') return '';
+    $t = htmlspecialchars($type,    ENT_QUOTES);
+    $m = htmlspecialchars($message, ENT_QUOTES);
+    $h = htmlspecialchars($title,   ENT_QUOTES);
+    return " data-notify-type=\"$t\" data-notify-message=\"$m\"" . ($h ? " data-notify-title=\"$h\"" : '');
+}
+
+/**
+ * Lưu thông báo vào session flash (dùng trước redirect).
+ * Layout sẽ tự đọc và hiển thị modal khi trang load.
+ */
+function setNotify(string $type, string $message, string $title = ''): void
+{
+    $_SESSION['notify_type']    = $type;
+    $_SESSION['notify_message'] = $message;
+    if ($title !== '') $_SESSION['notify_title'] = $title;
+}
+
 function redirect($link)
 {
 ?>

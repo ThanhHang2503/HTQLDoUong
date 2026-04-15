@@ -61,6 +61,12 @@ if (isset($_GET['bangluong']) && isset($_GET['print'])) {
    exit;
 }
 
+if (isset($_GET['luong_ca_nhan']) && isset($_GET['print'])) {
+   requireLogin();
+   require_once __DIR__ . '/src/views/luong_ca_nhan.php';
+   exit;
+}
+
 require_once __DIR__ . '/src/views/layout.php';
 renderAppLayoutStart($user_name, $current_role);
 ?>

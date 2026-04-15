@@ -2,8 +2,6 @@
 // Xem/sửa hồ sơ cá nhân của chính mình
 global $conn;
 $uid = currentUserId();
-$msg_success = '';
-$msg_error   = '';
 
 // Lấy thông tin hiện tại
 $sql = "SELECT a.account_id, a.full_name, a.email, a.phone, a.address, a.birth_date,
@@ -25,7 +23,7 @@ if (isset($_POST['update_profile'])) {
     $gender    = in_array($_POST['gender'] ?? '', ['nam','nữ','khác']) ? $_POST['gender'] : null;
 
     if ($full_name === '') {
-        $msg_error = 'Họ tên không được để trống.';
+        setNotify('error', 'Họ tên không được để trống.');
     } else {
         $safe_name = mysqli_real_escape_string($conn, $full_name);
         $bd_sql = $birth_date ? "'$birth_date'" : 'NULL';
@@ -35,11 +33,9 @@ if (isset($_POST['update_profile'])) {
                 WHERE account_id = $uid";
         mysqli_query($conn, $upd);
         $_SESSION['full_name'] = $full_name;
-        $msg_success = 'Cập nhật thông tin thành công!';
-        // Reload
-        $result2 = mysqli_query($conn, $sql);
-        $profile = mysqli_fetch_assoc($result2);
+        setNotify('success', 'Cập nhật thông tin thành công!');
     }
+    header('Location: user_page.php?profile'); exit;
 }
 
 // Đổi mật khẩu
@@ -50,16 +46,17 @@ if (isset($_POST['change_password'])) {
 
     $chk = mysqli_query($conn, "SELECT account_id FROM accounts WHERE account_id=$uid AND password='$old_pass'");
     if (mysqli_num_rows($chk) === 0) {
-        $msg_error = 'Mật khẩu hiện tại không đúng.';
+        setNotify('error', 'Mật khẩu hiện tại không đúng.');
     } elseif (strlen($new_pass) < 6) {
-        $msg_error = 'Mật khẩu mới phải có ít nhất 6 ký tự.';
+        setNotify('error', 'Mật khẩu mới phải có ít nhất 6 ký tự.');
     } elseif ($new_pass !== $cnf_pass) {
-        $msg_error = 'Xác nhận mật khẩu không khớp.';
+        setNotify('error', 'Xác nhận mật khẩu không khớp.');
     } else {
         $np = md5($new_pass);
         mysqli_query($conn, "UPDATE accounts SET password='$np' WHERE account_id=$uid");
-        $msg_success = 'Đổi mật khẩu thành công!';
+        setNotify('success', 'Đổi mật khẩu thành công!');
     }
+    header('Location: user_page.php?profile'); exit;
 }
 
 // Lấy lịch sử chức vụ
@@ -76,12 +73,7 @@ $pos_history = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
     <h1 class="head-name">HỒ SƠ CÁ NHÂN</h1>
     <div class="head-line"></div>
 
-    <?php if ($msg_success): ?>
-        <div class="alert alert-success"><?= htmlspecialchars($msg_success) ?></div>
-    <?php endif; ?>
-    <?php if ($msg_error): ?>
-        <div class="alert alert-danger"><?= htmlspecialchars($msg_error) ?></div>
-    <?php endif; ?>
+
 
     <div class="container-fluid">
         <div class="row g-3 mt-2">

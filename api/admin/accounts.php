@@ -28,8 +28,13 @@ try {
         $result = mysqli_query($conn, $sql);
         $accounts = $result ? mysqli_fetch_all($result, MYSQLI_ASSOC) : [];
         
-        // Đính kèm danh sách positions (Bao gồm Role ID ẩn bên trong)
-        $pos_result = mysqli_query($conn, "SELECT position_id, position_name, base_salary FROM positions WHERE position_id != 1 AND is_active = 1 ORDER BY position_name ASC");
+        // Danh sách chức vụ cho phép chọn: loại bỏ chức vụ Quản trị viên (position_id=1)
+        // Admin chỉ được tạo/quản lý trong trang admin riêng biệt
+        $pos_result = mysqli_query($conn, "SELECT p.position_id, p.position_name, p.base_salary
+                                           FROM positions p
+                                           WHERE p.position_id != 1
+                                             AND p.is_active = 1
+                                           ORDER BY p.position_name ASC");
         $positions = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
 
         echo json_encode(['success' => true, 'data' => $accounts, 'positions' => $positions]);
@@ -142,7 +147,8 @@ try {
             $password_sql = ", password = '$hashed_password'";
         }
 
-        // Bảo vệ Phân quyền: Chỉ Admin mới được phép đổi Role
+        // Phân quyền: Chỉ Admin mới được đổi role/position
+        // Đồng bộ role_id = position_id để đảm bảo nhất quán (Plan 2)
         $role_sql = "";
         if (currentRole() === AppRole::ADMIN) {
             $role_sql = ", role_id = $role_id";

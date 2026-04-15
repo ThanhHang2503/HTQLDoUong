@@ -78,7 +78,16 @@ if ($isManagerOrAdmin) {
 }
 ?>
 
-<body class="app-shell">
+<?php
+// Đọc thông báo từ session (set bởi các views sau POST-redirect)
+$_notify_type    = $_SESSION['notify_type']    ?? '';
+$_notify_msg     = $_SESSION['notify_message'] ?? '';
+$_notify_title   = $_SESSION['notify_title']   ?? '';
+// Xóa sau khi đọc (flash message pattern)
+unset($_SESSION['notify_type'], $_SESSION['notify_message'], $_SESSION['notify_title']);
+$_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
+?>
+<body class="app-shell"<?= $_notify_attrs ?>>
     <div class="nav-side p-0">
         <div class="logo p-1 justify-content-center text-center">
             <a href="user_page.php?home"> <img src="img/logo.jpg" alt="Logo"></a>

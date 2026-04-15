@@ -19,22 +19,24 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
 
         <!-- Bảng hiển thị -->
         <div class="card shadow-sm border-0">
-            <div class="card-body p-0 table-responsive">
-                <table class="table table-hover table-striped mb-0 text-center align-middle">
-                    <thead class="table-dark">
-                        <tr>
-                            <th width="80">ID</th>
-                            <th class="text-start">Họ tên & Email</th>
-                            <th>Chức vụ</th>
-                            <th>Trạng thái Nhân sự</th>
-                            <th>Trạng thái Hệ thống</th>
-                            <th width="150">Thao tác</th>
-                        </tr>
-                    </thead>
-                    <tbody id="accountsTableBody">
-                        <tr><td colspan="6" class="text-center py-4">Đang tải dữ liệu...</td></tr>
-                    </tbody>
-                </table>
+            <div class="card-body p-0">
+                <div style="max-height: 520px; overflow-y: auto; border-radius: 0 0 0.375rem 0.375rem;">
+                    <table class="table table-hover table-striped mb-0 text-center align-middle">
+                        <thead class="table-dark" style="position: sticky; top: 0; z-index: 2;">
+                            <tr>
+                                <th width="80">ID</th>
+                                <th class="text-start">Họ tên & Email</th>
+                                <th>Chức vụ</th>
+                                <th>Trạng thái Nhân sự</th>
+                                <th>Trạng thái Hệ thống</th>
+                                <th width="150">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accountsTableBody">
+                            <tr><td colspan="6" class="text-center py-4">Đang tải dữ liệu...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

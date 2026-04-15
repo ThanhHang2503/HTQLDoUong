@@ -70,7 +70,16 @@ if ($is_print) {
     echo '<td class="text-right">' . number_format($total_year,0,',','.') . '</td><td></td></tr>';
     echo '</tbody></table>';
     echo '<p style="margin-top:20px;font-size:11px">Ngày in: ' . date('d/m/Y H:i') . '</p>';
-    echo '<script>window.print()</script></body></html>';
+    echo '<script>
+    window.addEventListener("afterprint", function() {
+        window.opener
+            ? window.opener.location.href = "user_page.php?luong_ca_nhan&year=' . $selected_year . '&month=' . $selected_month . '&print_success=1"
+            : (window.location.href = "user_page.php?luong_ca_nhan&year=' . $selected_year . '&month=' . $selected_month . '&print_success=1");
+        window.close();
+    });
+    window.print();
+    </script></body></html>';
+
     exit;
 }
 ?>
@@ -79,15 +88,31 @@ if ($is_print) {
     <h1 class="head-name">BẢNG LƯƠNG CỦA TÔI</h1>
     <div class="head-line"></div>
 
+    <?php if (isset($_GET['print_success'])): ?>
+        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+            <i class="fa-solid fa-check-circle me-2"></i>
+            <strong>Đã in thành công bảng lương cá nhân năm <?= $selected_year ?>!</strong>
+            <?php if ($selected_month > 0): ?>
+                (Tháng <?= $selected_month ?>/<?= $selected_year ?>)
+            <?php endif; ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
     <!-- Cách tính lương -->
     <?php if ($my_position): ?>
-    <div class="alert alert-info mt-3">
-        <h6 class="fw-bold"><i class="fa-solid fa-circle-info me-2"></i>Cách tính lương của bạn (<?= htmlspecialchars($my_position['position_name']) ?>)</h6>
-        <p class="mb-1"><b>Công thức:</b> Lương thực lĩnh = Lương cơ bản + Phụ cấp + Thưởng − Khấu trừ</p>
+    <div class="alert alert-info mt-3 shadow-sm">
+        <h6 class="fw-bold"><i class="fa-solid fa-circle-info me-2"></i>Quy định tính lương mới</h6>
+        <div class="small">
+            <p class="mb-1">- <b>Làm đủ ≥ 28 ngày:</b> Hưởng trọn 100% Lương cơ bản.</p>
+            <p class="mb-1">- <b>Làm không đủ 28 ngày:</b> Lương = (Số ngày thực làm × LCB / 30).</p>
+            <p class="mb-1">- <b>Thay đổi chức vụ:</b> Lương được tính cộng dồn pro-rata cho từng giai đoạn.</p>
+            <p class="mb-0">- <b>Thực lĩnh:</b> = Lương (tính theo ngày) + Phụ cấp + Thưởng − Khấu trừ.</p>
+        </div>
+        <hr class="my-2">
         <p class="mb-0">
-            <b>Lương cơ bản hiện tại:</b>
-            <span class="text-success fw-bold"><?= number_format($my_position['base_salary'],0,',','.') ?> VND/tháng</span>
-            (theo chức vụ <?= htmlspecialchars($my_position['position_name']) ?>)
+            <b>Chức vụ:</b> <?= htmlspecialchars($my_position['position_name']) ?> | 
+            <b>Lương CB (tháng):</b> <span class="text-success fw-bold"><?= number_format($my_position['base_salary'],0,',','.') ?> VND</span>
         </p>
     </div>
     <?php endif; ?>

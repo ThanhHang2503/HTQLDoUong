@@ -70,7 +70,7 @@ if ($isManager && isset($_POST['approve_resignation'])) {
 if ($isManager) {
     $list_sql = "SELECT rr.*, a.full_name, p.position_name, ab.full_name AS approved_by_name
                  FROM resignation_requests rr
-                 JOIN accounts a ON a.account_id = rr.account_id
+                 JOIN accounts a ON a.account_id = rr.account_id AND a.role_id != 1
                  LEFT JOIN positions p ON p.position_id = a.position_id
                  LEFT JOIN accounts ab ON ab.account_id = rr.approved_by
                  ORDER BY rr.status='chờ duyệt' DESC, rr.created_at DESC";

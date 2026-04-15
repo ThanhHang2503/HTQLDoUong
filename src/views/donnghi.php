@@ -60,7 +60,7 @@ if ($isManager) {
     $list_sql = "SELECT lr.*, a.full_name, p.position_name,
                         ab.full_name AS approved_by_name
                  FROM leave_requests lr
-                 JOIN accounts a ON a.account_id = lr.account_id
+                 JOIN accounts a ON a.account_id = lr.account_id AND a.role_id != 1
                  LEFT JOIN positions p ON p.position_id = a.position_id
                  LEFT JOIN accounts ab ON ab.account_id = lr.approved_by
                  $where

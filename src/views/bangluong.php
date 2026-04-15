@@ -18,7 +18,7 @@ function getAutoDeduction($conn, $accountId, $month, $year) {
     $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
     $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
     
-    // 1. Lấy tất cả các ngày nghỉ được chấp thuận trong tháng
+    // Lấy tất cả các ngày nghỉ được chấp thuận trong tháng (để hiển thị gợi ý)
     $sql = "SELECT from_date, to_date FROM leave_requests 
             WHERE account_id = $accountId AND status = 'chấp thuận'
             AND from_date <= '$endOfMonth' AND to_date >= '$startOfMonth'";
@@ -36,40 +36,9 @@ function getAutoDeduction($conn, $accountId, $month, $year) {
         }
     }
     $leaveDates = array_unique($leaveDates);
-    if (empty($leaveDates)) return ['total' => 0, 'days' => 0];
-
-    // 2. Lấy lịch sử chức vụ ảnh hưởng đến tháng này
-    $sql = "SELECT eph.start_date, eph.end_date, p.base_salary
-            FROM employee_positions_history eph
-            JOIN positions p ON p.position_id = eph.position_id
-            WHERE eph.account_id = $accountId
-            AND eph.start_date <= '$endOfMonth'
-            AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')
-            ORDER BY eph.start_date ASC";
-    $res = mysqli_query($conn, $sql);
-    $history = $res ? mysqli_fetch_all($res, MYSQLI_ASSOC) : [];
-
-    $totalDeduction = 0;
-    foreach ($leaveDates as $d) {
-        $dailySalaryForDay = 0;
-        foreach ($history as $h) {
-            $hStart = $h['start_date'];
-            $hEnd = $h['end_date'] ?: '9999-12-31';
-            if ($d >= $hStart && $d <= $hEnd) {
-                $dailySalaryForDay = (int)$h['base_salary'] / 30;
-                break;
-            }
-        }
-        // Nếu không tìm thấy lịch sử cho ngày đó, có thể dùng lương hiện tại của user
-        if ($dailySalaryForDay == 0) {
-            $currentPosRes = mysqli_query($conn, "SELECT p.base_salary FROM accounts a JOIN positions p ON p.position_id = a.position_id WHERE a.account_id = $accountId");
-            $cp = mysqli_fetch_assoc($currentPosRes);
-            $dailySalaryForDay = ($cp['base_salary'] ?? 0) / 30;
-        }
-        $totalDeduction += $dailySalaryForDay;
-    }
     
-    return ['total' => round($totalDeduction), 'days' => count($leaveDates)];
+    // Trả về 0 cho số tiền (vì đã trừ vào base salary qua số ngày làm)
+    return ['total' => 0, 'days' => count($leaveDates)];
 }
 
 /**
@@ -79,67 +48,94 @@ function getAutoDeduction($conn, $accountId, $month, $year) {
 function getProRatedBaseSalary($conn, $accountId, $month, $year) {
     $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
     $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
-    $startTs = strtotime($startOfMonth);
-    $endTs = strtotime($endOfMonth);
+    $totalDaysInMonth = (int)date('t', strtotime($startOfMonth));
 
-    // Lấy hire_date để kiểm tra xem có phải nhân viên mới vào làm giữa tháng không
-    $acc_res = mysqli_query($conn, "SELECT hire_date FROM accounts WHERE account_id = $accountId");
-    $acc_row = mysqli_fetch_assoc($acc_res);
-    $hireTs = !empty($acc_row['hire_date']) ? strtotime($acc_row['hire_date']) : $startTs;
+    // 1. Lấy ngày nghỉ không lương (không tính lương cho các ngày này)
+    $leaveSql = "SELECT from_date, to_date FROM leave_requests 
+                 WHERE account_id = $accountId AND status = 'chấp thuận' AND leave_type = 'không lương'
+                 AND from_date <= '$endOfMonth' AND to_date >= '$startOfMonth'";
+    $leaveRes = mysqli_query($conn, $leaveSql);
+    $unpaidLeaveDates = [];
+    if ($leaveRes) {
+        while ($l = mysqli_fetch_assoc($leaveRes)) {
+            $curr = max(strtotime($l['from_date']), strtotime($startOfMonth));
+            $last = min(strtotime($l['to_date']), strtotime($endOfMonth));
+            while ($curr <= $last) {
+                $unpaidLeaveDates[date('Y-m-d', $curr)] = true;
+                $curr = strtotime('+1 day', $curr);
+            }
+        }
+    }
 
-    // Ngày bắt đầu tính lương thực tế trong tháng này (Max của Đầu tháng và Ngày vào làm)
-    $calcStartTs = max($startTs, $hireTs);
-    
-    // Nếu ngày vào làm sau tháng đang xét => lương 0
-    if ($calcStartTs > $endTs) return ['total' => 0, 'is_prorated' => false];
+    // 2. Lấy lịch sử chức vụ
+    $historySql = "SELECT eph.start_date, eph.end_date, p.base_salary
+                   FROM employee_positions_history eph
+                   JOIN positions p ON p.position_id = eph.position_id
+                   WHERE eph.account_id = $accountId
+                   AND eph.start_date <= '$endOfMonth'
+                   AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')
+                   ORDER BY eph.start_date ASC";
+    $histRes = mysqli_query($conn, $historySql);
+    $history = $histRes ? mysqli_fetch_all($histRes, MYSQLI_ASSOC) : [];
 
-    $isMidMonthHire = ($hireTs > $startTs && $hireTs <= $endTs);
-
-    // Lấy lịch sử chức vụ ảnh hưởng đến tháng này
-    $sql = "SELECT eph.start_date, eph.end_date, p.base_salary
-            FROM employee_positions_history eph
-            JOIN positions p ON p.position_id = eph.position_id
-            WHERE eph.account_id = $accountId
-            AND eph.start_date <= '$endOfMonth'
-            AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')
-            ORDER BY eph.start_date ASC";
-    $res = mysqli_query($conn, $sql);
-    $history = $res ? mysqli_fetch_all($res, MYSQLI_ASSOC) : [];
-
+    // Nếu không có lịch sử, dùng chức vụ hiện tại
     if (empty($history)) {
-        // Fallback: Lấy lương hiện tại và pro-rate theo ngày vào làm
         $sql = "SELECT p.base_salary FROM accounts a 
                 JOIN positions p ON p.position_id = a.position_id 
                 WHERE a.account_id = $accountId";
         $cp_res = mysqli_query($conn, $sql);
         $cp = mysqli_fetch_assoc($cp_res);
-        $base = (int)($cp['base_salary'] ?? 0);
-        
-        $days = floor(($endTs - $calcStartTs) / 86400) + 1;
-        return [
-            'total' => round(($days * $base) / 30), 
-            'is_prorated' => $isMidMonthHire
+        $history[] = [
+            'start_date' => '2000-01-01',
+            'end_date' => '2099-12-31',
+            'base_salary' => $cp['base_salary'] ?? 0
         ];
     }
 
-    $totalBaseSalary = 0;
-    foreach ($history as $h) {
-        $hStart = strtotime($h['start_date']);
-        $hEnd = $h['end_date'] ? strtotime($h['end_date']) : strtotime('2099-12-31');
+    $workingDaysByPos = []; 
+    $totalWorkingDays = 0;
 
-        // Overlap giữa (Chức vụ) và (Tháng này && Sau ngày vào làm)
-        $overlapStart = max($hStart, $calcStartTs);
-        $overlapEnd = min($hEnd, $endTs);
+    for ($d = 1; $d <= $totalDaysInMonth; $d++) {
+        $dateStr = sprintf("%04d-%02d-%02d", $year, $month, $d);
+        $ts = strtotime($dateStr);
 
-        if ($overlapStart <= $overlapEnd) {
-            $days = floor(($overlapEnd - $overlapStart) / 86400) + 1;
-            $totalBaseSalary += ($days * (int)$h['base_salary']) / 30;
+        $currentPos = null;
+        foreach ($history as $h) {
+            $sTs = strtotime($h['start_date']);
+            $eTs = $h['end_date'] ? strtotime($h['end_date']) : strtotime('2099-12-31');
+            if ($ts >= $sTs && $ts <= $eTs) {
+                $currentPos = $h;
+                break;
+            }
+        }
+
+        if ($currentPos && !isset($unpaidLeaveDates[$dateStr])) {
+            $sal = (int)$currentPos['base_salary'];
+            if (!isset($workingDaysByPos[$sal])) {
+                $workingDaysByPos[$sal] = ['days' => 0, 'base_salary' => $sal];
+            }
+            $workingDaysByPos[$sal]['days']++;
+            $totalWorkingDays++;
+        }
+    }
+
+    $finalBaseSalary = 0;
+    if ($totalWorkingDays >= 28) {
+        $weightedSum = 0;
+        foreach ($workingDaysByPos as $pos) {
+            $weightedSum += ($pos['days'] / $totalWorkingDays) * $pos['base_salary'];
+        }
+        $finalBaseSalary = $weightedSum;
+    } else {
+        foreach ($workingDaysByPos as $pos) {
+            $finalBaseSalary += ($pos['days'] * $pos['base_salary'] / 30);
         }
     }
 
     return [
-        'total' => round($totalBaseSalary), 
-        'is_prorated' => (count($history) > 1 || $isMidMonthHire)
+        'total' => round($finalBaseSalary),
+        'working_days' => $totalWorkingDays,
+        'is_prorated' => ($totalWorkingDays < 28 || count($workingDaysByPos) > 1)
     ];
 }
 
@@ -193,6 +189,7 @@ if ($emp_result) {
         // Lương cơ bản gộp (Pro-rated)
         $proRateInfo = getProRatedBaseSalary($conn, $e['account_id'], $sel_month, $sel_year);
         $e['base_salary'] = $proRateInfo['total'];
+        $e['working_days'] = $proRateInfo['working_days'];
         $e['is_prorated'] = $proRateInfo['is_prorated'];
 
         $employees[] = $e;
@@ -261,9 +258,11 @@ if (isset($_GET['print'])) {
     <td></td></tr></tfoot>
     </table>
     <script>
+    // Dùng afterprint để redirect sau khi hộp thoại in đóng lại
+    window.addEventListener('afterprint', function() {
+        window.location.href = 'user_page.php?bangluong&month=<?= $sel_month ?>&year=<?= $sel_year ?>&print_success=1';
+    });
     window.print();
-    // Quay lại trang lương sau khi in xong hoặc hủy
-    window.location.href = 'user_page.php?bangluong&month=<?= $sel_month ?>&year=<?= $sel_year ?>';
     </script></body></html>
     <?php
     exit;
@@ -275,10 +274,21 @@ if (isset($_GET['print'])) {
     <div class="head-line"></div>
 
     <?php if ($msg_success): ?>
-        <div class="alert alert-success"><?= htmlspecialchars($msg_success) ?></div>
+        <div class="alert alert-success alert-dismissible fade show"><?= htmlspecialchars($msg_success) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
     <?php endif; ?>
     <?php if ($msg_error): ?>
-        <div class="alert alert-danger"><?= htmlspecialchars($msg_error) ?></div>
+        <div class="alert alert-danger alert-dismissible fade show"><?= htmlspecialchars($msg_error) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+    <?php if (isset($_GET['print_success'])): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fa-solid fa-check-circle me-2"></i>
+            <strong>In bảng lương thành công!</strong> Bảng lương tháng <?= $sel_month ?>/<?= $sel_year ?> đã được in.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
     <?php endif; ?>
 
     <!-- Bộ lọc tháng/năm -->
@@ -374,7 +384,9 @@ if (isset($_GET['print'])) {
                                         data-deduction="<?= $emp['auto_deduction'] ?>"
                                         data-leave="<?= $emp['leave_days'] ?>"
                                         data-prorated="<?= $emp['is_prorated'] ? '1' : '0' ?>"
-                                        data-pos="<?= htmlspecialchars($emp['position_name'] ?? '') ?>">
+                                        data-pos="<?= htmlspecialchars($emp['position_name'] ?? '') ?>"
+                                        data-days="<?= $emp['working_days'] ?>">
+
                                     <?= htmlspecialchars($emp['full_name']) ?>
                                     <?= $emp['is_prorated'] ? ' (Gộp)' : '' ?>
                                     <?= in_array($emp['account_id'], $has_salary) ? '✓' : '' ?>
@@ -384,7 +396,10 @@ if (isset($_GET['print'])) {
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Lương cơ bản (tự động) <span id="prorateHint" class="text-info small ms-2"></span></label>
-                            <input type="text" class="form-control bg-light" id="baseSalaryDisplay" disabled>
+                            <div class="input-group">
+                                <input type="text" class="form-control bg-light" id="baseSalaryDisplay" disabled>
+                                <span class="input-group-text bg-light" id="workingDaysDisplay">0 ngày</span>
+                            </div>
                             <input type="hidden" name="base_salary_val" id="baseSalaryHidden">
                         </div>
                         <div class="mb-2">
@@ -543,20 +558,22 @@ function fillBaseSalary(sel) {
     const salary = parseInt(option.dataset.salary) || 0;
     const autoDeduct = parseInt(option.dataset.deduction) || 0;
     const leaveDays = parseInt(option.dataset.leave) || 0;
+    const workingDays = parseInt(option.dataset.days) || 0;
     const isProrated = option.dataset.prorated === '1';
 
     document.getElementById('baseSalaryDisplay').value = salary.toLocaleString('vi-VN') + ' VND';
+    document.getElementById('workingDaysDisplay').textContent = workingDays + ' ngày làm';
     document.getElementById('baseSalaryHidden').value = salary; 
     document.getElementById('deductInput').value = autoDeduct;
     
     if (leaveDays > 0) {
-        document.getElementById('leaveHint').textContent = `(Tự động: trừ ${leaveDays} ngày nghỉ)`;
+        document.getElementById('leaveHint').textContent = `(Có ${leaveDays} ngày nghỉ)`;
     } else {
         document.getElementById('leaveHint').textContent = '';
     }
 
     if (isProrated) {
-        document.getElementById('prorateHint').textContent = '(Đã tính gộp theo lịch sử chức vụ)';
+        document.getElementById('prorateHint').textContent = '(Đã tính theo logic ≥28 ngày)';
     } else {
         document.getElementById('prorateHint').textContent = '';
     }
