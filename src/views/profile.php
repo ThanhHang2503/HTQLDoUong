@@ -35,7 +35,8 @@ if (isset($_POST['update_profile'])) {
         $_SESSION['full_name'] = $full_name;
         setNotify('success', 'Cập nhật thông tin thành công!');
     }
-    header('Location: user_page.php?profile'); exit;
+    redirect('user_page.php?profile'); 
+    exit;
 }
 
 // Đổi mật khẩu
@@ -56,7 +57,8 @@ if (isset($_POST['change_password'])) {
         mysqli_query($conn, "UPDATE accounts SET password='$np' WHERE account_id=$uid");
         setNotify('success', 'Đổi mật khẩu thành công!');
     }
-    header('Location: user_page.php?profile'); exit;
+    redirect('user_page.php?profile'); 
+    exit;
 }
 
 // Lấy lịch sử chức vụ

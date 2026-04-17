@@ -32,8 +32,12 @@ if (!isset($ds_donhang_timkiem)) {
     <div class="head-line"></div>
     <div class="container-fluid row justify-content-between">
         <form action="user_page.php?" method="GET" class="d-flex col-8 my-2" role="search">
-            <input class="form-control me-2" type="text" placeholder="Nhập mã đơn hàng" name='timkiem-donhang' aria-label="Search" required>
-            <button class="btn btn-outline-success" type="submit">Tìm</button>
+            <input class="form-control me-2" type="text" placeholder="Tìm kiếm theo ID, khách hàng hoặc nhân viên..." 
+                   name='timkiem-donhang' value="<?= htmlspecialchars($_GET['timkiem-donhang'] ?? '') ?>" aria-label="Search">
+            <button class="btn btn-outline-success me-2" type="submit">Tìm</button>
+            <?php if (isset($_GET['timkiem-donhang'])): ?>
+                <a href="user_page.php?donhang" class="btn btn-outline-secondary" style="white-space: nowrap;">Hủy lọc</a>
+            <?php endif; ?>
         </form>
         <div class="text-end col-4">
             <a href="user_page.php?donhang=them" class="my-2 btn btn-success fw-bolder"><i class="fa-solid fa-file-circle-plus"></i> Tạo mới hóa đơn</a>
@@ -55,10 +59,10 @@ if (!isset($ds_donhang_timkiem)) {
                     <td><?= $hd[1] ?></td>
                     <td><?= $hd[2] ?></td>
                     <td><?= $hd[3] ?></td>
-                    <td><?= intval($hd[4]) ?></td>
+                    <td class="fw-bold text-success"><?= number_format((int)$hd[4], 0, ',', '.') ?> VNĐ</td>
                     <td>
-                        <a href="user_page.php?donhang=xoa&id=<?= $hd[0] ?>"><i class="btn btn-outline-danger fa-solid fa-trash"></i></a>
-                        <a href="user_page.php?donhang=in&id=<?= $hd[0] ?>"><i class="btn btn-outline-primary fa-solid fa-print"></i></i></a>
+                        <a href="user_page.php?donhang=in&id=<?= $hd[0] ?>" title="Xem chi tiết" class="me-1"><i class="btn btn-outline-info fa-solid fa-eye"></i></a>
+                        <a href="user_page.php?donhang=in&id=<?= $hd[0] ?>" title="In hóa đơn"><i class="btn btn-outline-primary fa-solid fa-print"></i></a>
                     </td>
                 </tr>
             <?php endforeach; ?>

@@ -24,7 +24,7 @@ if ($onlyLowStock) {
 }
 
 $whereClause = implode(' AND ', $conditions);
-$sql = "SELECT i.item_id, i.item_name, c.category_name, i.purchase_price, i.unit_price, i.stock_quantity,
+$sql = "SELECT i.item_id, i.item_code, i.item_name, c.category_name, i.purchase_price, i.unit_price, i.stock_quantity,
                (i.stock_quantity * i.purchase_price) AS stock_value,
                (i.stock_quantity * i.unit_price) AS projected_revenue
         FROM items i
@@ -157,7 +157,7 @@ foreach ($rows as $row) {
         <table class="table table-hover table-striped table-bordered text-center">
             <thead>
                 <tr>
-                    <th>Mã</th>
+                    <th>Mã SP</th>
                     <th>Tên sản phẩm</th>
                     <th>Loại</th>
                     <th>Tồn kho</th>
@@ -171,7 +171,7 @@ foreach ($rows as $row) {
                 <?php foreach ($rows as $row): ?>
                     <?php $qty = (int)($row['stock_quantity'] ?? 0); ?>
                     <tr>
-                        <td><?= (int)$row['item_id'] ?></td>
+                        <td><span class="font-monospace text-secondary"><?= htmlspecialchars($row['item_code'] ?? '') ?></span></td>
                         <td><?= htmlspecialchars($row['item_name']) ?></td>
                         <td><?= htmlspecialchars((string)$row['category_name']) ?></td>
                         <td>

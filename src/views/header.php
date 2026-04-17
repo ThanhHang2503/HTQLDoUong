@@ -139,17 +139,19 @@ if ($isManagerOrAdmin) {
                     <a class="text-truncate <?= isset($_GET['phieunhap']) ? 'active' : '' ?>"
                        href="user_page.php?phieunhap"><i class="fa-solid fa-file-import"></i> Phiếu nhập</a>
                 </div>
+                <?php if (!$isWarehouseRole) : ?>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['phieuxuat']) ? 'active' : '' ?>"
                        href="user_page.php?phieuxuat"><i class="fa-solid fa-file-export"></i> Phiếu xuất</a>
                 </div>
+                <?php endif; ?>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['nhacungcap']) ? 'active' : '' ?>"
                        href="user_page.php?nhacungcap"><i class="fa-solid fa-truck-field"></i> Nhà cung cấp</a>
                 </div>
                 <div class="container-fluid">
-                    <a class="text-truncate <?= isset($_GET['kho_thongke']) ? 'active' : '' ?>"
-                       href="user_page.php?kho_thongke"><i class="fa-solid fa-warehouse"></i> Tồn kho</a>
+                    <a class="text-truncate <?= isset($_GET['baocao_kho']) ? 'active' : '' ?>"
+                       href="user_page.php?baocao_kho"><i class="fa-solid fa-warehouse"></i> Báo cáo kho</a>
                 </div>
             <?php endif; ?>
 

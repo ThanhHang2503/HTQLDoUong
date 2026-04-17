@@ -1,13 +1,9 @@
 <?php
+// Deletion is disabled to maintain inventory and financial record integrity.
+// requirePermission(AppPermission::ADMIN); // If we wanted only admins to do it
 
-$sql = 'delete from invoice_details where invoice_id = ' . $_GET['id'];
-mysqli_query($conn,$sql);
+setNotify('warning', 'Hệ thống không cho phép xóa hóa đơn để đảm bảo tính toàn vẹn của dữ liệu tồn kho và báo cáo.');
 
-$sql = 'delete from invoices where invoice_id = ' . $_GET['id'];
-mysqli_query($conn,$sql);
-
-$_SESSION['xoa_don_hang_thanh_cong'] = 'Bạn đã xóa đơn hàng thành công';
-
-header('Location: user_page.php?donhang');
-
+redirect('user_page.php?donhang');
+exit;
 ?>

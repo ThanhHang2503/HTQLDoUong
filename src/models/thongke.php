@@ -1,6 +1,6 @@
 <?php
 
-require __DIR__ . '/../../config.php';
+require_once __DIR__ . '/../../config.php';
 
 $start_date = '';
 $end_date_string = '';
@@ -11,6 +11,7 @@ $total_revenue = 0;
 $customer_sales_rows = [];
 $mon_chay_rows = [];
 $name_best_staff_rows = [];
+$top_customers_data = []; // Use array for safer iteration
 
 if (isset($_POST['start_date']) && isset($_POST['end_date'])) {
 	$start_date = $_POST['start_date'];
@@ -122,6 +123,23 @@ try {
 				$name_best_staff_rows = [];
 			}
 			$stmt5->close();
+
+			// --- Top 5 khách hàng mua nhiều nhất ---
+			$top_customers_sql = "SELECT c.customer_id, c.customer_name, c.phone_number, c.email,
+									COUNT(iv.invoice_id) AS total_orders,
+									SUM(iv.total) AS total_spent
+								 FROM invoices iv
+								 JOIN customers c ON iv.customer_id = c.customer_id
+								 WHERE iv.creation_time >= ? AND iv.creation_time < ?
+								 GROUP BY c.customer_id
+								 ORDER BY total_spent DESC
+								 LIMIT 5";
+			$stmt6 = $conn->prepare($top_customers_sql);
+			$stmt6->bind_param('ss', $start_date, $end_date);
+			$stmt6->execute();
+			$res = $stmt6->get_result();
+			$top_customers_data = $res ? mysqli_fetch_all($res, MYSQLI_ASSOC) : [];
+			$stmt6->close();
 		}
 	}
 } catch (Exception $e) {

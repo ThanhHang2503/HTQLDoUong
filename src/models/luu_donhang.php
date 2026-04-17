@@ -7,6 +7,7 @@ if (isset($_POST)) {
     $account_id = $_POST["account_id"];
     $customer_name = $_POST["customer_name"];
     $phone_number = $_POST["phone_number"];
+    $email = $_POST["email"] ?? '';
     $total = $_POST["total"];
     $discount = $_POST["discount2"];
 
@@ -32,7 +33,7 @@ if (isset($_POST)) {
         $result[] = $subarray;
     }
 
-    taoHoaDon($conn,$customer_name, $phone_number, $account_id, $result, $discount, $total);
+    taoHoaDon($conn, $customer_name, $phone_number, $account_id, $result, $discount, $total, $email);
     $_SESSION['tao_don_hang_thanh_cong'] = 'Bạn đã tạo 1 đơn hàng thành công';
     redirect('user_page.php?donhang');
 }

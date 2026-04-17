@@ -5,6 +5,10 @@ $uid  = currentUserId();
 $role = currentRole();
 $isManager = $role === AppRole::MANAGER || $role === AppRole::ADMIN;
 
+// Tháng hiện tại (dùng cho filter danh sách)
+$cur_month = (int)date('n');
+$cur_year  = (int)date('Y');
+
 $msg_success = '';
 $msg_error   = '';
 
@@ -56,7 +60,11 @@ if ($isManager && isset($_POST['approve_leave'])) {
 // Lấy danh sách đơn
 if ($isManager) {
     $filter_status = $_GET['filter_status'] ?? '';
-    $where = $filter_status ? "WHERE lr.status = '" . mysqli_real_escape_string($conn,$filter_status) . "'" : '';
+    // Filter theo tháng hiện tại
+    $where = "WHERE MONTH(lr.from_date) = $cur_month AND YEAR(lr.from_date) = $cur_year";
+    if ($filter_status) {
+        $where .= " AND lr.status = '" . mysqli_real_escape_string($conn, $filter_status) . "'";
+    }
     $list_sql = "SELECT lr.*, a.full_name, p.position_name,
                         ab.full_name AS approved_by_name
                  FROM leave_requests lr

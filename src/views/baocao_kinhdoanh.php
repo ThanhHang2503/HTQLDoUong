@@ -1,21 +1,17 @@
 <?php
 // Báo cáo kinh doanh - doanh thu, lợi nhuận, thống kê xuất hàng
-requirePermission(AppPermission::VIEW_REPORTS);
+if (!can(AppPermission::VIEW_REPORTS) && !can(AppPermission::PROCESS_ORDERS)) {
+    requirePermission(AppPermission::VIEW_REPORTS);
+}
 global $conn;
 
 $sel_year    = (int)($_GET['year']    ?? date('Y'));
-$sel_quarter = (int)($_GET['quarter'] ?? 0); // 0 = cả năm
-$sel_month   = (int)($_GET['month']   ?? 0); // 0 = cả năm/quý
+$sel_month   = (int)($_GET['month']   ?? 0); // 0 = cả năm
 
 // Xây dựng điều kiện WHERE
 $where_revenue = "WHERE iv.status != 'cancelled' AND YEAR(iv.creation_time) = $sel_year";
 $where_export  = "WHERE YEAR(ie.export_date) = $sel_year";
-if ($sel_quarter > 0) {
-    $qm_start = ($sel_quarter - 1) * 3 + 1;
-    $qm_end   = $qm_start + 2;
-    $where_revenue .= " AND MONTH(iv.creation_time) BETWEEN $qm_start AND $qm_end";
-    $where_export  .= " AND MONTH(ie.export_date) BETWEEN $qm_start AND $qm_end";
-} elseif ($sel_month > 0) {
+if ($sel_month > 0) {
     $where_revenue .= " AND MONTH(iv.creation_time) = $sel_month";
     $where_export  .= " AND MONTH(ie.export_date) = $sel_month";
 }
@@ -24,36 +20,46 @@ if ($sel_quarter > 0) {
 $revenue_sql = "SELECT
     COUNT(DISTINCT iv.invoice_id) AS total_invoices,
     SUM(iv.total) AS total_revenue,
-    SUM(iv.discount) AS total_discount,
-    SUM(id.quantity * i.purchase_price) AS total_cost
+    SUM(iv.discount) AS total_discount
   FROM invoices iv
-  LEFT JOIN invoice_details id ON id.invoice_id = iv.invoice_id
-  LEFT JOIN items i ON i.item_id = id.item_id
   $where_revenue";
 $rev_r = mysqli_query($conn, $revenue_sql);
 $rev_summary = $rev_r ? mysqli_fetch_assoc($rev_r) : [];
 
+$where_import = "WHERE status != 'cancelled' AND YEAR(import_date) = $sel_year";
+if ($sel_month > 0) {
+    $where_import .= " AND MONTH(import_date) = $sel_month";
+}
+$import_sql = "SELECT SUM(total_value) as total_cost FROM inventory_receipts $where_import";
+$imp_r = mysqli_query($conn, $import_sql);
+$imp_summary = $imp_r ? mysqli_fetch_assoc($imp_r) : [];
+
 $total_revenue = (float)($rev_summary['total_revenue'] ?? 0);
-$total_cost    = (float)($rev_summary['total_cost'] ?? 0);
+$total_cost    = (float)($imp_summary['total_cost'] ?? 0);
 $total_profit  = $total_revenue - $total_cost;
 $profit_margin = $total_revenue > 0 ? round($total_profit / $total_revenue * 100, 1) : 0;
 
 // 2. Doanh thu theo tháng (chart data)
 $monthly_sql = "SELECT MONTH(iv.creation_time) AS thang,
     SUM(iv.total) AS doanh_thu,
-    SUM(id.quantity * i.purchase_price) AS chi_phi,
     COUNT(DISTINCT iv.invoice_id) AS so_hd
   FROM invoices iv
-  LEFT JOIN invoice_details id ON id.invoice_id = iv.invoice_id
-  LEFT JOIN items i ON i.item_id = id.item_id
   WHERE iv.status != 'cancelled' AND YEAR(iv.creation_time) = $sel_year
-  GROUP BY MONTH(iv.creation_time)
-  ORDER BY thang";
+  GROUP BY MONTH(iv.creation_time)";
 $month_r = mysqli_query($conn, $monthly_sql);
 $monthly_data = $month_r ? mysqli_fetch_all($month_r, MYSQLI_ASSOC) : [];
 
+// 2b. Chi phí nhập theo tháng
+$import_monthly_sql = "SELECT MONTH(import_date) AS thang,
+    SUM(total_value) AS chi_phi_nhap
+  FROM inventory_receipts
+  WHERE status != 'cancelled' AND YEAR(import_date) = $sel_year
+  GROUP BY MONTH(import_date)";
+$import_month_r = mysqli_query($conn, $import_monthly_sql);
+$import_monthly_data = $import_month_r ? mysqli_fetch_all($import_month_r, MYSQLI_ASSOC) : [];
+
 // 3. Top sản phẩm bán chạy
-$top_items_sql = "SELECT i.item_name, c.category_name,
+$top_items_sql = "SELECT i.item_id, i.item_name, c.category_name,
     SUM(id.quantity) AS total_qty,
     SUM(id.quantity * id.unit_price) AS revenue,
     SUM(id.quantity * i.purchase_price) AS cost,
@@ -81,22 +87,46 @@ $staff_sql = "SELECT a.full_name,
 $staff_r = mysqli_query($conn, $staff_sql);
 $staff_stats = $staff_r ? mysqli_fetch_all($staff_r, MYSQLI_ASSOC) : [];
 
-// 5. Thống kê xuất kho riêng (phiếu xuất)
-$export_sql = "SELECT COUNT(*) AS total_exports, SUM(total_value) AS total_export_value,
-    SUM((SELECT SUM(ei.quantity*ei.purchase_price) FROM inventory_export_items ei WHERE ei.export_id=ie.export_id)) AS export_cost
-  FROM inventory_exports ie $where_export";
-$exp_r = mysqli_query($conn, $export_sql);
-$exp_summary = $exp_r ? mysqli_fetch_assoc($exp_r) : [];
+
 
 // Chart data arrays
 $chart_months  = array_fill(1, 12, 0);
 $chart_revenue = array_fill(1, 12, 0);
+$chart_cost    = array_fill(1, 12, 0);
 $chart_profit  = array_fill(1, 12, 0);
+
+// Map array data to months
+$monthly_table_data = [];
+for ($m=1; $m<=12; $m++) {
+    $monthly_table_data[$m] = ['thang' => $m, 'doanh_thu' => 0, 'chi_phi_nhap' => 0, 'so_hd' => 0];
+}
 foreach ($monthly_data as $md) {
     $m = (int)$md['thang'];
     $chart_revenue[$m] = (float)$md['doanh_thu'];
-    $chart_profit[$m]  = (float)$md['doanh_thu'] - (float)$md['chi_phi'];
+    $monthly_table_data[$m]['doanh_thu'] = (float)$md['doanh_thu'];
+    $monthly_table_data[$m]['so_hd'] = (int)$md['so_hd'];
 }
+foreach ($import_monthly_data as $imd) {
+    $m = (int)$imd['thang'];
+    $chart_cost[$m] = (float)$imd['chi_phi_nhap'];
+    $monthly_table_data[$m]['chi_phi_nhap'] = (float)$imd['chi_phi_nhap'];
+}
+for ($m=1; $m<=12; $m++) {
+    $chart_profit[$m] = $chart_revenue[$m] - $chart_cost[$m];
+}
+
+// 5. Top 5 khách hàng mua nhiều nhất
+$top_customers_sql = "SELECT c.customer_id, c.customer_name, c.phone_number, c.email,
+    COUNT(iv.invoice_id) AS total_orders,
+    SUM(iv.total) AS total_spent
+  FROM invoices iv
+  JOIN customers c ON c.customer_id = iv.customer_id
+  $where_revenue
+  GROUP BY c.customer_id
+  ORDER BY total_spent DESC
+  LIMIT 5";
+$cust_r = mysqli_query($conn, $top_customers_sql);
+$top_customers = $cust_r ? mysqli_fetch_all($cust_r, MYSQLI_ASSOC) : [];
 ?>
 
 <div class="dash_board px-2">
@@ -110,16 +140,7 @@ foreach ($monthly_data as $md) {
             <label class="form-label">Năm</label>
             <input type="number" class="form-control" name="year" value="<?= $sel_year ?>" min="2020" max="2040">
         </div>
-        <div class="col-md-2">
-            <label class="form-label">Quý (0=tất cả)</label>
-            <select class="form-select" name="quarter">
-                <option value="0" <?= $sel_quarter==0?'selected':'' ?>>Cả năm</option>
-                <option value="1" <?= $sel_quarter==1?'selected':'' ?>>Quý 1 (T1-T3)</option>
-                <option value="2" <?= $sel_quarter==2?'selected':'' ?>>Quý 2 (T4-T6)</option>
-                <option value="3" <?= $sel_quarter==3?'selected':'' ?>>Quý 3 (T7-T9)</option>
-                <option value="4" <?= $sel_quarter==4?'selected':'' ?>>Quý 4 (T10-T12)</option>
-            </select>
-        </div>
+
         <div class="col-md-2">
             <label class="form-label">Tháng (0=tất cả)</label>
             <select class="form-select" name="month">
@@ -136,7 +157,7 @@ foreach ($monthly_data as $md) {
 
     <!-- Tóm tắt -->
     <div class="row g-3 mb-3">
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card border-primary text-center shadow-sm">
                 <div class="card-body">
                     <div class="text-primary mb-1"><i class="fa-solid fa-receipt fa-2x"></i></div>
@@ -145,7 +166,7 @@ foreach ($monthly_data as $md) {
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card border-success text-center shadow-sm">
                 <div class="card-body">
                     <div class="text-success mb-1"><i class="fa-solid fa-coins fa-2x"></i></div>
@@ -154,7 +175,7 @@ foreach ($monthly_data as $md) {
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
             <div class="card border-warning text-center shadow-sm">
                 <div class="card-body">
                     <div class="text-warning mb-1"><i class="fa-solid fa-cart-shopping fa-2x"></i></div>
@@ -163,15 +184,7 @@ foreach ($monthly_data as $md) {
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-<?= $total_profit >= 0 ? 'success' : 'danger' ?> text-center shadow-sm">
-                <div class="card-body">
-                    <div class="text-<?= $total_profit >= 0 ? 'success' : 'danger' ?> mb-1"><i class="fa-solid fa-chart-line fa-2x"></i></div>
-                    <div class="fs-5 fw-bold text-<?= $total_profit >= 0 ? 'success' : 'danger' ?>"><?= number_format($total_profit,0,',','.') ?></div>
-                    <small class="text-muted">Lợi nhuận gộp (<?= $profit_margin ?>%)</small>
-                </div>
-            </div>
-        </div>
+
     </div>
 
     <!-- Biểu đồ doanh thu theo tháng -->
@@ -190,7 +203,7 @@ foreach ($monthly_data as $md) {
                 <div class="card-body p-0">
                     <table class="table table-sm table-striped table-bordered mb-0 text-center">
                         <thead class="table-dark">
-                            <tr><th>#</th><th>Sản phẩm</th><th>SL bán</th><th>Doanh thu</th><th>Lợi nhuận</th></tr>
+                            <tr><th>#</th><th>Sản phẩm</th><th>SL bán</th><th>Doanh thu</th></tr>
                         </thead>
                         <tbody>
                             <?php foreach ($top_items as $k => $ti): ?>
@@ -199,14 +212,19 @@ foreach ($monthly_data as $md) {
                                 <td class="text-start"><b><?= htmlspecialchars($ti['item_name']) ?></b>
                                     <br><small class="text-muted"><?= htmlspecialchars($ti['category_name'] ?? '') ?></small></td>
                                 <td><?= number_format($ti['total_qty']) ?></td>
-                                <td class="text-success"><?= number_format($ti['revenue'],0,',','.') ?></td>
-                                <td class="text-<?= $ti['profit'] >= 0 ? 'success' : 'danger' ?> fw-bold">
-                                    <?= number_format($ti['profit'],0,',','.') ?>
+                                <td class="text-success fw-bold">
+                                    <?= number_format($ti['revenue'],0,',','.') ?> đ
+                                    <button type="button" class="btn btn-sm btn-outline-info border-0 ms-1 no-print" 
+                                            onclick="showSalesDetail(<?= $ti['item_id'] ?>, '<?= htmlspecialchars(addslashes($ti['item_name'])) ?>')" 
+                                            title="Xem chi tiết hóa đơn">
+                                        <i class="fa-solid fa-circle-info"></i>
+                                    </button>
                                 </td>
+
                             </tr>
                             <?php endforeach; ?>
                             <?php if (empty($top_items)): ?>
-                            <tr><td colspan="5" class="text-muted">Không có dữ liệu</td></tr>
+                            <tr><td colspan="4" class="text-muted">Không có dữ liệu</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -237,27 +255,62 @@ foreach ($monthly_data as $md) {
             </div>
 
             <!-- Chi tiết doanh thu từng tháng -->
-            <div class="card shadow-sm">
+            <div class="card shadow-sm mb-3">
                 <div class="card-header fw-bold"><i class="fa-solid fa-table me-2"></i>Bảng Doanh Thu Từng Tháng</div>
                 <div class="card-body p-0">
-                    <table class="table table-sm table-striped table-bordered mb-0 text-center">
-                        <thead class="table-secondary"><tr><th>Tháng</th><th>Doanh thu</th><th>Lợi nhuận</th><th>SL HĐ</th></tr></thead>
-                        <tbody>
-                            <?php foreach ($monthly_data as $md):
-                                $lnhuan = (float)$md['doanh_thu'] - (float)$md['chi_phi'];
-                            ?>
-                            <tr>
-                                <td>T<?= $md['thang'] ?></td>
-                                <td class="text-success"><?= number_format($md['doanh_thu'],0,',','.') ?></td>
-                                <td class="text-<?= $lnhuan >= 0 ? 'success' : 'danger' ?>"><?= number_format($lnhuan,0,',','.') ?></td>
-                                <td><?= $md['so_hd'] ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                            <?php if (empty($monthly_data)): ?>
-                            <tr><td colspan="4" class="text-muted">Không có dữ liệu</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                    <div class="top-cust-scroll" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-striped table-bordered mb-0 text-center">
+                            <thead class="table-secondary"><tr><th>Th/Năm</th><th>Doanh thu</th><th>Chi phí</th><th>Lợi nhuận</th></tr></thead>
+                            <tbody>
+                                <?php 
+                                $has_data = false;
+                                foreach ($monthly_table_data as $md):
+                                    if ($md['doanh_thu'] > 0 || $md['chi_phi_nhap'] > 0):
+                                        $has_data = true;
+                                        $lnhuan = $md['doanh_thu'] - $md['chi_phi_nhap'];
+                                ?>
+                                <tr>
+                                    <td><?= $md['thang'] ?>/<?= $sel_year ?></td>
+                                    <td class="text-success fw-bold"><?= number_format($md['doanh_thu'],0,',','.') ?></td>
+                                    <td class="text-warning fw-bold"><?= number_format($md['chi_phi_nhap'],0,',','.') ?></td>
+                                    <td class="<?= $lnhuan >= 0 ? 'text-primary' : 'text-danger' ?> fw-bold"><?= number_format($lnhuan,0,',','.') ?></td>
+                                </tr>
+                                <?php endif; endforeach; ?>
+                                <?php if (!$has_data): ?>
+                                <tr><td colspan="4" class="text-muted">Không có dữ liệu</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top 5 Khách hàng mua nhiều nhất -->
+            <div class="card shadow-sm">
+                <div class="card-header fw-bold bg-primary text-white"><i class="fa-solid fa-crown me-2"></i>Top 5 Khách Hàng Thân Thiết</div>
+                <div class="card-body p-0">
+                    <div class="top-cust-scroll" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-striped mb-0 text-center">
+                            <thead class="table-light">
+                                <tr><th>Khách hàng</th><th>Số đơn</th><th>Tổng chi tiêu</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($top_customers as $tc): ?>
+                                <tr>
+                                    <td class="text-start">
+                                        <div class="fw-bold"><?= htmlspecialchars($tc['customer_name']) ?></div>
+                                        <small class="text-muted"><?= htmlspecialchars($tc['phone_number'] ?: $tc['email'] ?: '-') ?></small>
+                                    </td>
+                                    <td><span class="badge bg-secondary"><?= $tc['total_orders'] ?></span></td>
+                                    <td class="text-success fw-bold"><?= number_format($tc['total_spent'],0,',','.') ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (empty($top_customers)): ?>
+                                <tr><td colspan="3" class="text-muted">Không có dữ liệu</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -269,6 +322,7 @@ foreach ($monthly_data as $md) {
 <script>
 const labels = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
 const revenueData = <?= json_encode(array_values($chart_revenue)) ?>;
+const costData    = <?= json_encode(array_values($chart_cost)) ?>;
 const profitData  = <?= json_encode(array_values($chart_profit)) ?>;
 
 new Chart(document.getElementById('revenueChart'), {
@@ -277,22 +331,30 @@ new Chart(document.getElementById('revenueChart'), {
         labels: labels,
         datasets: [
             {
+                type: 'bar',
                 label: 'Doanh thu (VND)',
                 data: revenueData,
                 backgroundColor: 'rgba(53, 162, 235, 0.6)',
                 borderColor: 'rgba(53, 162, 235, 1)',
-                borderWidth: 1,
-                order: 2
+                borderWidth: 1
             },
             {
-                label: 'Lợi nhuận gộp (VND)',
-                data: profitData,
+                type: 'bar',
+                label: 'Chi phí hàng hóa (VND)',
+                data: costData,
+                backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                borderColor: 'rgba(255, 159, 64, 1)',
+                borderWidth: 1
+            },
+            {
                 type: 'line',
-                borderColor: 'rgba(75, 192, 92, 1)',
-                backgroundColor: 'rgba(75, 192, 92, 0.1)',
-                fill: true,
-                tension: 0.3,
-                order: 1
+                label: 'Lợi nhuận (VND)',
+                data: profitData,
+                backgroundColor: 'rgba(75, 192, 192, 1)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.1
             }
         ]
     },
@@ -305,6 +367,86 @@ new Chart(document.getElementById('revenueChart'), {
         }
     }
 });
+</script>
+<!-- Modal Chi Tiết Bán Hàng -->
+<div class="modal fade" id="salesDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg border-0">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title fw-bold" id="salesDetailTitle">Chi tiết bán hàng</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered table-striped text-center mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Mã HĐ</th>
+                                <th>Khách hàng</th>
+                                <th>Giá bán</th>
+                                <th>Số lượng</th>
+                                <th>Thành tiền</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesDetailBody"></tbody>
+                        <tfoot class="table-light">
+                            <tr class="fw-bold">
+                                <td colspan="4" class="text-end">TỔNG CỘNG:</td>
+                                <td id="salesDetailTotal" class="text-danger">0đ</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function showSalesDetail(itemId, itemName) {
+    const modal = new bootstrap.Modal(document.getElementById('salesDetailModal'));
+    const title = document.getElementById('salesDetailTitle');
+    const tbody = document.getElementById('salesDetailBody');
+    const totalEl = document.getElementById('salesDetailTotal');
+    
+    title.innerText = `Chi tiết bán hàng: ${itemName}`;
+    tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i>Đang tải dữ liệu...</td></tr>';
+    totalEl.innerText = '0đ';
+    modal.show();
+
+    try {
+        const year = <?= $sel_year ?>;
+        const month = <?= $sel_month ?>;
+        const res = await fetch(`api/business/product_sales_details.php?item_id=${itemId}&year=${year}&month=${month}`);
+        const result = await res.json();
+
+        if (result.success) {
+            if (result.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-muted">Không có dữ liệu hóa đơn</td></tr>';
+                return;
+            }
+
+            let html = '';
+            let grandTotal = 0;
+            result.data.forEach(row => {
+                grandTotal += row.line_total;
+                html += `<tr>
+                    <td><code>#${row.invoice_id}</code></td>
+                    <td class="text-start">${row.customer}</td>
+                    <td>${Number(row.unit_price).toLocaleString('vi-VN')}đ</td>
+                    <td>${row.quantity}</td>
+                    <td class="fw-bold">${Number(row.line_total).toLocaleString('vi-VN')}đ</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            totalEl.innerText = grandTotal.toLocaleString('vi-VN') + 'đ';
+        } else {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-danger">Lỗi: ${result.message}</td></tr>`;
+        }
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-danger">Lỗi kết nối: ${err}</td></tr>`;
+    }
+}
 </script>
 </div>
 </div>

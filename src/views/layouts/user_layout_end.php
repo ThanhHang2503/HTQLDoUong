@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
 	tables.forEach(function (table) {
 		var parent = table.parentElement;
 		if (!parent) return;
-		if (parent.classList.contains('product-table-scroll') || parent.classList.contains('content-table-scroll')) { return; }
+		if (parent.classList.contains('product-table-scroll') || parent.classList.contains('content-table-scroll') || parent.classList.contains('top-cust-scroll')) { return; }
 		var wrapper = document.createElement('div');
 		wrapper.className = 'content-table-scroll';
 		parent.insertBefore(wrapper, table);

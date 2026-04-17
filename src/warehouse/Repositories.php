@@ -85,7 +85,12 @@ class ItemRepository {
     }
 
     public function updateStock(int $item_id, int $new_stock_quantity): bool {
-        $sql = "UPDATE items SET stock_quantity = {$new_stock_quantity} WHERE item_id = {$item_id}";
+        // Đồng thời cập nhật sale_status: stock=0 → stopped, stock>0 → selling
+        $sale_status = $new_stock_quantity <= 0 ? 'stopped' : 'selling';
+        $sql = "UPDATE items
+                SET stock_quantity = {$new_stock_quantity},
+                    sale_status    = '{$sale_status}'
+                WHERE item_id = {$item_id}";
         return (bool)mysqli_query($this->conn, $sql);
     }
 
@@ -398,7 +403,7 @@ class StockMovementRepository {
         $reference_id = $movement->reference_id === null ? 'NULL' : (string)$movement->reference_id;
         $note = $movement->note === null ? 'NULL' : "'" . mysqli_real_escape_string($this->conn, $movement->note) . "'";
 
-        $sql = "INSERT INTO inventory_stock_movements (
+        $sql = "INSERT INTO stock_movements (
                     item_id, movement_type, quantity_change, stock_before, stock_after,
                     unit_cost, reference_type, reference_id, note, created_by
                 ) VALUES (
@@ -413,7 +418,7 @@ class StockMovementRepository {
         $sql = "SELECT m.movement_id, m.item_id, i.item_name, m.movement_type, m.quantity_change,
                        m.stock_before, m.stock_after, m.unit_cost, m.reference_type,
                        m.reference_id, m.note, m.created_by, a.full_name AS created_by_name, m.created_at
-                FROM inventory_stock_movements m
+                FROM stock_movements m
                 INNER JOIN items i ON i.item_id = m.item_id
                 INNER JOIN accounts a ON a.account_id = m.created_by
                 WHERE 1=1";

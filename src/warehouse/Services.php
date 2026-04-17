@@ -316,6 +316,38 @@ class GoodsReceiptService {
         return $this->receiptRepo->getReceiptById($receipt_id);
     }
 
+    public function updateReceiptHeaderOnly(int $receipt_id, array $data, int $updated_by): array {
+        $existing = $this->receiptRepo->getReceiptById($receipt_id);
+        if (!$existing) {
+            return ['success' => false, 'message' => 'Phiếu nhập không tồn tại'];
+        }
+
+        if (empty($data['supplier_id'])) {
+            return ['success' => false, 'message' => 'Nhà cung cấp không được để trống'];
+        }
+
+        $supplier = $this->supplierRepo->getById((int)$data['supplier_id']);
+        if (!$supplier || $supplier->status !== 'active') {
+            return ['success' => false, 'message' => 'Nhà cung cấp không hợp lệ'];
+        }
+
+        mysqli_begin_transaction($this->conn);
+        try {
+            $importDate = $data['import_date'] ?? $existing['import_date'];
+            $note = $data['note'] ?? ($existing['note'] ?? null);
+
+            if (!$this->receiptRepo->updateReceiptHeader($receipt_id, (int)$data['supplier_id'], $importDate, (float)$existing['total_value'], $note)) {
+                throw new \Exception('Không thể cập nhật phiếu nhập');
+            }
+
+            mysqli_commit($this->conn);
+            return ['success' => true, 'message' => 'Cập nhật thông tin phiếu nhập thành công'];
+        } catch (\Throwable $e) {
+            mysqli_rollback($this->conn);
+            return ['success' => false, 'message' => 'Cập nhật thất bại', 'error' => $e->getMessage()];
+        }
+    }
+
     public function updateReceipt(int $receipt_id, array $data, int $updated_by): array {
         $existing = $this->receiptRepo->getReceiptById($receipt_id);
         if (!$existing) {

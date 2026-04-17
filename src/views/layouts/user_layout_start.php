@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="css/style.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.3.2/jspdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 
 </head>
@@ -119,16 +120,12 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
                        href="user_page.php?phieunhap"><i class="fa-solid fa-file-import"></i> Phiếu nhập</a>
                 </div>
                 <div class="container-fluid">
-                    <a class="text-truncate <?= isset($_GET['phieuxuat']) ? 'active' : '' ?>"
-                       href="user_page.php?phieuxuat"><i class="fa-solid fa-file-export"></i> Phiếu xuất</a>
-                </div>
-                <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['nhacungcap']) ? 'active' : '' ?>"
                        href="user_page.php?nhacungcap"><i class="fa-solid fa-truck-field"></i> Nhà cung cấp</a>
                 </div>
                 <div class="container-fluid">
-                    <a class="text-truncate <?= isset($_GET['kho_thongke']) ? 'active' : '' ?>"
-                       href="user_page.php?kho_thongke"><i class="fa-solid fa-warehouse"></i> Tồn kho</a>
+                    <a class="text-truncate <?= isset($_GET['baocao_kho']) ? 'active' : '' ?>"
+                       href="user_page.php?baocao_kho"><i class="fa-solid fa-warehouse"></i> Báo cáo kho</a>
                 </div>
             <?php endif; ?>
 
@@ -142,6 +139,10 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['khachhang']) ? 'active' : '' ?>"
                        href="user_page.php?khachhang"><i class="fa-solid fa-address-book"></i> Khách hàng</a>
+                </div>
+                <div class="container-fluid">
+                    <a class="text-truncate <?= isset($_GET['baocao_kinhdoanh']) ? 'active' : '' ?>"
+                       href="user_page.php?baocao_kinhdoanh"><i class="fa-solid fa-chart-line"></i> Báo cáo kinh doanh</a>
                 </div>
             <?php endif; ?>
         </div>
