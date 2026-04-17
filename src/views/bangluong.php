@@ -45,7 +45,14 @@ function getAutoDeduction($conn, $accountId, $month, $year) {
  * Tính lương cơ bản gộp (Pro-rated) dựa trên lịch sử chức vụ
  * Công thức: Σ (Số ngày giữ chức vụ / 30) * Lương CB của chức vụ đó
  */
-function getProRatedBaseSalary($conn, $accountId, $month, $year) {
+function getProRatedBaseSalary($conn, $accountId, $month, $year, $hireDate = null) {
+    if (!$hireDate) {
+        $hireSql = "SELECT hire_date FROM accounts WHERE account_id = $accountId";
+        $hireRes = mysqli_query($conn, $hireSql);
+        $hireData = mysqli_fetch_assoc($hireRes);
+        $hireDate = $hireData['hire_date'] ?? '2000-01-01';
+    }
+    
     $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
     $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
     $totalDaysInMonth = (int)date('t', strtotime($startOfMonth));
@@ -118,6 +125,18 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
             }
             $workingDaysByPos[$pid]['days']++;
             $totalWorkingDays++;
+        } elseif (!$currentPos && !isset($unpaidLeaveDates[$dateStr]) && $ts >= strtotime($hireDate)) {
+            // Gap handling: If before first history entry but after hire date, use earliest history entry as proxy
+            if (!empty($history)) {
+                $firstPos = $history[0]; // history is sorted by start_date ASC
+                $sal = (int)$firstPos['base_salary'];
+                $pid = (int)$firstPos['position_id'];
+                if (!isset($workingDaysByPos[$pid])) {
+                    $workingDaysByPos[$pid] = ['days' => 0, 'base_salary' => $sal, 'position_id' => $pid];
+                }
+                $workingDaysByPos[$pid]['days']++;
+                $totalWorkingDays++;
+            }
         }
     }
 
@@ -139,10 +158,17 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
         }
     }
 
+    $reason = '';
+    if ($distinctPositionsCount >= 2) {
+        $reason = 'multi';
+    } elseif ($distinctPositionsCount === 1 && $totalWorkingDays < 28) {
+        $reason = 'less_28';
+    }
+
     return [
         'total' => round($finalBaseSalary),
         'working_days' => $totalWorkingDays,
-        'is_prorated' => ($distinctPositionsCount >= 2 || ($distinctPositionsCount === 1 && $totalWorkingDays < 28))
+        'prorate_reason' => $reason
     ];
 }
 
@@ -177,7 +203,7 @@ if (isset($_POST['delete_salary'])) {
 }
 
 // Danh sách nhân viên (để tính lương)
-$emp_sql = "SELECT a.account_id, a.full_name, r.display_name AS role_name,
+$emp_sql = "SELECT a.account_id, a.full_name, a.hire_date, r.display_name AS role_name,
                    p.position_name, p.base_salary
             FROM accounts a
             JOIN roles r ON r.id = a.role_id
@@ -194,10 +220,10 @@ if ($emp_result) {
         $e['leave_days'] = $deductInfo['days'];
 
         // Lương cơ bản gộp (Pro-rated)
-        $proRateInfo = getProRatedBaseSalary($conn, $e['account_id'], $sel_month, $sel_year);
+        $proRateInfo = getProRatedBaseSalary($conn, $e['account_id'], $sel_month, $sel_year, $e['hire_date']);
         $e['base_salary'] = $proRateInfo['total'];
         $e['working_days'] = $proRateInfo['working_days'];
-        $e['is_prorated'] = $proRateInfo['is_prorated'];
+        $e['prorate_reason'] = $proRateInfo['prorate_reason'];
 
         $employees[] = $e;
     }
@@ -390,12 +416,12 @@ if (isset($_GET['print'])) {
                                         data-salary="<?= $emp['base_salary'] ?>"
                                         data-deduction="<?= $emp['auto_deduction'] ?>"
                                         data-leave="<?= $emp['leave_days'] ?>"
-                                        data-prorated="<?= $emp['is_prorated'] ? '1' : '0' ?>"
+                                        data-prorate-reason="<?= $emp['prorate_reason'] ?>"
                                         data-pos="<?= htmlspecialchars($emp['position_name'] ?? '') ?>"
                                         data-days="<?= $emp['working_days'] ?>">
 
                                     <?= htmlspecialchars($emp['full_name']) ?>
-                                    <?= $emp['is_prorated'] ? ' (Gộp)' : '' ?>
+                                    <?= $emp['prorate_reason'] === 'multi' ? ' (Gộp CV)' : '' ?>
                                     <?= in_array($emp['account_id'], $has_salary) ? '✓' : '' ?>
                                 </option>
                                 <?php endforeach; ?>
@@ -566,7 +592,7 @@ function fillBaseSalary(sel) {
     const autoDeduct = parseInt(option.dataset.deduction) || 0;
     const leaveDays = parseInt(option.dataset.leave) || 0;
     const workingDays = parseInt(option.dataset.days) || 0;
-    const isProrated = option.dataset.prorated === '1';
+    const reason = option.dataset.prorateReason;
 
     document.getElementById('baseSalaryDisplay').value = salary.toLocaleString('vi-VN') + ' VND';
     document.getElementById('workingDaysDisplay').textContent = workingDays + ' ngày làm';
@@ -579,8 +605,12 @@ function fillBaseSalary(sel) {
         document.getElementById('leaveHint').textContent = '';
     }
 
-    if (isProrated) {
-        document.getElementById('prorateHint').textContent = '(Đã tính theo logic ≥28 ngày)';
+    if (reason === 'multi') {
+        document.getElementById('prorateHint').textContent = '(Tính gộp nhiều chức vụ)';
+        document.getElementById('prorateHint').className = 'text-success small ms-2';
+    } else if (reason === 'less_28') {
+        document.getElementById('prorateHint').textContent = '(Tính theo tỷ lệ < 28 ngày)';
+        document.getElementById('prorateHint').className = 'text-info small ms-2';
     } else {
         document.getElementById('prorateHint').textContent = '';
     }

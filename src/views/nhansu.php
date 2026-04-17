@@ -113,6 +113,26 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
                             <input type="password" class="form-control" id="ac_password" placeholder="Nhập mật khẩu">
                             <div class="form-text" id="ac_password_help">Để trống nếu không muốn đổi mật khẩu.</div>
                         </div>
+                        </div>
+                    </div>
+
+                    <!-- PHẦN LỊCH SỬ CHỨC VỤ (Mới) -->
+                    <div id="sectionHistory" style="display:none;" class="mt-4 border-top pt-3">
+                        <h6 class="fw-bold mb-3"><i class="fa-solid fa-clock-rotate-left me-2"></i>Lịch Sử Biến Động Chức Vụ</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Chức vụ</th>
+                                        <th>Từ ngày</th>
+                                        <th>Đến ngày</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody">
+                                    <!-- Rendered by JS -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -369,12 +389,53 @@ function viewAccountDetails(id) {
     setModalReadOnly(true);
     modalAccount.show();
 
+    // Fetch history
+    fetchHistory(id);
+
     // Khôi phục lại hiển thị ô password khi đóng modal (sẽ reset ở các hàm open khác)
     const cleanup = () => {
         document.getElementById('ac_password').parentElement.style.display = 'block';
+        document.getElementById('sectionHistory').style.display = 'none';
         document.getElementById('modalAccount').removeEventListener('hidden.bs.modal', cleanup);
     };
     document.getElementById('modalAccount').addEventListener('hidden.bs.modal', cleanup);
+}
+
+async function fetchHistory(id) {
+    const historySection = document.getElementById('sectionHistory');
+    const tbody = document.getElementById('historyTableBody');
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center italic text-muted">Đang tải lịch sử...</td></tr>';
+    historySection.style.display = 'block';
+
+    try {
+        const res = await fetch(`api/admin/history.php?account_id=${id}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+            tbody.innerHTML = '';
+            if (data.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Chưa có lịch sử biến động.</td></tr>';
+            } else {
+                data.data.forEach(h => {
+                    const tr = document.createElement('tr');
+                    const endDateStr = h.end_date ? formatDate(h.end_date) : '<span class="badge text-bg-success">Hiện tại</span>';
+                    tr.innerHTML = `
+                        <td><b>${h.position_name}</b><br><small class="text-muted">${h.reason || ''}</small></td>
+                        <td>${formatDate(h.start_date)}</td>
+                        <td>${endDateStr}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Lỗi tải lịch sử.</td></tr>';
+    }
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('vi-VN');
 }
 
 async function saveAccount(e) {

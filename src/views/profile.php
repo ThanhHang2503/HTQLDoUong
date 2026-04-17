@@ -66,9 +66,21 @@ $pos_sql = "SELECT eph.start_date, eph.end_date, p.position_name, p.base_salary,
             FROM employee_positions_history eph
             JOIN positions p ON p.position_id = eph.position_id
             WHERE eph.account_id = $uid
-            ORDER BY eph.start_date DESC";
+            ORDER BY eph.start_date ASC"; // Sorted ASC for logic check
 $pos_result = mysqli_query($conn, $pos_sql);
 $pos_history = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
+
+// Check if we need to show a virtual "Hire" entry
+$first_hist_date = !empty($pos_history) ? $pos_history[0]['start_date'] : null;
+$show_hire_virtual = false;
+if ($profile['hire_date'] && ($first_hist_date === null || $profile['hire_date'] < $first_hist_date)) {
+    $show_hire_virtual = true;
+}
+
+// Re-sort for display (Descending)
+usort($pos_history, function($a, $b) {
+    return strcmp($b['start_date'], $a['start_date']);
+});
 ?>
 
 <div class="dash_board px-2">
@@ -204,6 +216,12 @@ $pos_history = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
                                     <td><?= $ph['end_date'] ? date('d/m/Y', strtotime($ph['end_date'])) : '<span class="badge text-bg-success">Hiện tại</span>' ?></td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php if ($show_hire_virtual): ?>
+                                <tr class="table-info">
+                                    <td colspan="2"><i class="fa-solid fa-star me-1"></i> Ngày vào làm hạch toán</td>
+                                    <td><?= date('d/m/Y', strtotime($profile['hire_date'])) ?></td>
+                                </tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                         <?php endif; ?>

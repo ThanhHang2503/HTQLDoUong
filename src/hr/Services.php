@@ -71,10 +71,10 @@ class EmployeeService {
         $email = mysqli_real_escape_string($this->conn, $data['email']);
         $pass = md5($data['password'] ?? '123');
         $role_id = (int)($data['role_id'] ?? 3); // sales by default
-        $position_id = (int)($data['position_id'] ?? 2);
+        $hire_date = mysqli_real_escape_string($this->conn, $data['hire_date'] ?? date('Y-m-d'));
         
-        $query = "INSERT INTO accounts (full_name, email, password, role_id, position_id, status) 
-                  VALUES ('$name', '$email', '$pass', $role_id, $position_id, 'active')";
+        $query = "INSERT INTO accounts (full_name, email, password, role_id, position_id, status, hire_date) 
+                  VALUES ('$name', '$email', '$pass', $role_id, $position_id, 'active', '$hire_date')";
         
         if (mysqli_query($this->conn, $query)) {
             $account_id = (int)mysqli_insert_id($this->conn);
@@ -83,7 +83,7 @@ class EmployeeService {
             $hist = new PositionHistory([
                 'account_id' => $account_id,
                 'position_id' => $position_id,
-                'start_date' => date('Y-m-d'),
+                'start_date' => $hire_date,
             ]);
             $this->posHistRepo->create($hist);
             
