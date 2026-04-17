@@ -254,7 +254,7 @@ foreach ($monthly_wages as $mw) {
     <!-- Chart lương -->
     <div class="card shadow-sm mb-4">
         <div class="card-header fw-bold"><i class="fa-solid fa-chart-bar me-2"></i>Biểu Đồ Biến Động Ngân Sách Lương Thưởng (Năm <?= $sel_year ?>)</div>
-        <div class="card-body"><canvas id="wageChart" height="80"></canvas></div>
+        <div class="card-body"><canvas id="wageChart" height="160"></canvas></div>
     </div>
 
     <div class="row g-3 mb-5">

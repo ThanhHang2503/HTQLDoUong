@@ -3,59 +3,6 @@
 requirePermission(AppPermission::MANAGE_STAFF);
 global $conn;
 
-
-
-// Thêm chức vụ
-if (isset($_POST['add_position'])) {
-    $name    = trim(mysqli_real_escape_string($conn, $_POST['position_name'] ?? ''));
-    $salary  = (int)($_POST['base_salary'] ?? 0);
-    $desc    = trim(mysqli_real_escape_string($conn, $_POST['description'] ?? ''));
-    if ($name === '' || $salary <= 0) {
-        setNotify('error', 'Tên chức vụ và lương cơ bản là bắt buộc.');
-    } else {
-        mysqli_query($conn, "INSERT INTO positions (position_name, base_salary, description) VALUES ('$name', $salary, '$desc')");
-        setNotify('success', "Đã thêm chức vụ '$name'.");
-    }
-    header('Location: user_page.php?chucvu'); exit;
-}
-
-// Sửa chức vụ
-if (isset($_POST['edit_position'])) {
-    $pid    = (int)($_POST['position_id'] ?? 0);
-    $name   = trim(mysqli_real_escape_string($conn, $_POST['position_name'] ?? ''));
-    $salary = (int)($_POST['base_salary'] ?? 0);
-    $desc   = trim(mysqli_real_escape_string($conn, $_POST['description'] ?? ''));
-    $active = isset($_POST['is_active']) ? 1 : 0;
-    if ($pid > 0 && $name !== '' && $salary > 0) {
-        mysqli_query($conn, "UPDATE positions SET position_name='$name', base_salary=$salary,
-                              description='$desc', is_active=$active WHERE position_id=$pid");
-        setNotify('success', 'Đã cập nhật chức vụ.');
-    } else {
-        setNotify('error', 'Dữ liệu chức vụ không hợp lệ.');
-    }
-    header('Location: user_page.php?chucvu'); exit;
-}
-
-// Đổi chức vụ nhân viên
-if (isset($_POST['change_employee_position'])) {
-    $acc_id  = (int)($_POST['account_id'] ?? 0);
-    $new_pos = (int)($_POST['new_position_id'] ?? 0);
-    $reason  = trim(mysqli_real_escape_string($conn, $_POST['change_reason'] ?? ''));
-    $date    = trim($_POST['change_date'] ?? date('Y-m-d'));
-    // Chặn gán chức vụ Quản trị viên (position_id=1) từ giao diện HR
-    if ($acc_id > 0 && $new_pos > 0 && $new_pos != 1) {
-        mysqli_query($conn, "UPDATE employee_positions_history SET end_date='$date'
-                              WHERE account_id=$acc_id AND end_date IS NULL");
-        mysqli_query($conn, "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason, created_by)
-                              VALUES ($acc_id, $new_pos, '$date', '$reason', " . currentUserId() . ")");
-        mysqli_query($conn, "UPDATE accounts SET position_id=$new_pos, role_id=$new_pos WHERE account_id=$acc_id");
-        setNotify('success', 'Đã đổi chức vụ nhân viên thành công.');
-    } elseif ($new_pos == 1) {
-        setNotify('error', 'Không thể gán chức vụ Quản trị viên từ giao diện nhân sự.');
-    }
-    header('Location: user_page.php?chucvu'); exit;
-}
-
 // Lấy danh sách chức vụ — loại bỏ position_id=1 (Quản trị viên, chỉ quản lý trong trang Admin)
 $positions_sql = "SELECT p.*, (SELECT COUNT(*) FROM accounts a WHERE a.position_id = p.position_id AND a.hr_status='active') AS employee_count
                   FROM positions p 

@@ -235,7 +235,7 @@ if (isset($_POST['category_id']) && isset($_POST['category_name'])) {
 }
 //Hết phần loại
 
-//Thêm sản phẩm
+// Thêm sản phẩm
 if (!isset($_POST['item_id']) && isset($_POST['item_name']) && isset($_POST['category_id']) && isset($_POST['description'])) {
    requirePermission(AppPermission::MANAGE_CATALOG);
    $item_name = trim((string)$_POST['item_name']);
@@ -245,16 +245,62 @@ if (!isset($_POST['item_id']) && isset($_POST['item_name']) && isset($_POST['cat
    $unit_price = 0;
    $stock_quantity = 0;
 
+   // 0. Kiểm tra ảnh bắt buộc (Yêu cầu mới)
+   $upload_file = $_FILES['item_image_file'] ?? null;
+   if (!$upload_file || $upload_file['error'] !== UPLOAD_ERR_OK) {
+       $_SESSION['sanpham_error'] = 'Bắt buộc phải tải lên ảnh sản phẩm.';
+       header('location:user_page.php?sanpham=them');
+       exit;
+   }
+
+   // Kiểm tra định dạng ảnh (JPG, PNG)
+   $allowed_mime   = ['image/jpeg', 'image/jpg', 'image/png'];
+   $max_size_bytes = 5 * 1024 * 1024; // 5MB
+
+   $finfo = finfo_open(FILEINFO_MIME_TYPE);
+   $mime  = finfo_file($finfo, $upload_file['tmp_name']);
+   finfo_close($finfo);
+
+   if (!in_array($mime, $allowed_mime)) {
+       $_SESSION['sanpham_error'] = 'Ảnh không hợp lệ! Chỉ chấp nhận JPG, JPEG hoặc PNG.';
+       header('location:user_page.php?sanpham=them');
+       exit;
+   }
+
    if ($item_name === '' || $description === '' || $category_id <= 0) {
       $_SESSION['sanpham_error'] = 'Vui lòng nhập đầy đủ thông tin sản phẩm hợp lệ (tên, danh mục, mô tả).';
       header('location:user_page.php?sanpham=them');
       exit;
    }
 
-   $safe_name = mysqli_real_escape_string($conn, $item_name);
+   $safe_name        = mysqli_real_escape_string($conn, $item_name);
    $safe_description = mysqli_real_escape_string($conn, $description);
-   $insert = "INSERT INTO items (item_name, category_id, description, unit_price, purchase_price, stock_quantity, item_status) values('{$safe_name}', {$category_id}, '{$safe_description}', {$unit_price}, {$purchase_price}, {$stock_quantity}, 'active')";
-   mysqli_query($conn, $insert);
+
+   // 1. INSERT sản phẩm vào DB trước để lấy item_id
+   $insert = "INSERT INTO items (item_name, category_id, description, unit_price, purchase_price, stock_quantity, item_status)
+              VALUES ('{$safe_name}', {$category_id}, '{$safe_description}', {$unit_price}, {$purchase_price}, {$stock_quantity}, 'active')";
+   
+   if (!mysqli_query($conn, $insert)) {
+       $_SESSION['sanpham_error'] = 'Lỗi hệ thống khi thêm sản phẩm: ' . mysqli_error($conn);
+       header('location:user_page.php?sanpham=them');
+       exit;
+   }
+   
+   $new_item_id = (int)mysqli_insert_id($conn);
+
+   // 2. Xử lý lưu ảnh theo item_id
+   $dest_filename = $new_item_id . '.jpg';
+   $dest_path     = __DIR__ . '/img/' . $dest_filename;
+
+   if (move_uploaded_file($upload_file['tmp_name'], $dest_path)) {
+      $item_image_path = 'img/' . $dest_filename;
+      $esc_img = mysqli_real_escape_string($conn, $item_image_path);
+      mysqli_query($conn, "UPDATE items SET item_image = '$esc_img' WHERE item_id = $new_item_id");
+      $_SESSION['sanpham_success'] = 'Thêm sản phẩm và ảnh thành công.';
+   } else {
+      $_SESSION['sanpham_error'] = 'Thêm sản phẩm thành công nhưng không thể lưu ảnh.';
+   }
+
    header('location:user_page.php?sanpham');
    exit;
 }
@@ -274,6 +320,30 @@ if (isset($_GET['sanpham']) && $_GET['sanpham'] === 'sua' && isset($_POST['item_
       $_SESSION['sanpham_error'] = 'Vui lòng nhập đầy đủ thông tin hợp lệ.';
       header('location:user_page.php?sanpham=sua&id=' . ($item_id ?: 0));
       exit;
+   }
+
+   // Xử lý upload ảnh mới (nếu có)
+   $upload_file = $_FILES['item_image_file'] ?? null;
+   if ($upload_file && $upload_file['error'] === UPLOAD_ERR_OK) {
+       $allowed_mime   = ['image/jpeg', 'image/jpg', 'image/png'];
+       $max_size_bytes = 5 * 1024 * 1024; // 5MB
+
+       $finfo = finfo_open(FILEINFO_MIME_TYPE);
+       $mime  = finfo_file($finfo, $upload_file['tmp_name']);
+       finfo_close($finfo);
+
+       if (in_array($mime, $allowed_mime) && $upload_file['size'] <= $max_size_bytes) {
+           $dest_filename = $item_id . '.jpg';
+           $dest_path     = __DIR__ . '/img/' . $dest_filename;
+           if (move_uploaded_file($upload_file['tmp_name'], $dest_path)) {
+               $esc_img = mysqli_real_escape_string($conn, 'img/' . $dest_filename);
+               mysqli_query($conn, "UPDATE items SET item_image = '$esc_img' WHERE item_id = $item_id");
+           }
+       } else {
+           $_SESSION['sanpham_error'] = 'Ảnh không hợp lệ hoặc quá lớn (tối đa 5MB).';
+           header('location:user_page.php?sanpham=sua&id=' . $item_id);
+           exit;
+       }
    }
 
    // Nếu tồn kho = 0 → bắt buộc ngừng bán
@@ -527,6 +597,60 @@ if (isset($_POST['warehouse_receipt_delete_submit'])) {
 
    header('location:user_page.php?phieunhap');
    exit;
+}
+
+// =====================================================================
+// QUẢN LÝ CHỨC VỤ - POST HANDLING
+// =====================================================================
+if (isset($_POST['add_position'])) {
+    requirePermission(AppPermission::MANAGE_STAFF);
+    $name    = trim(mysqli_real_escape_string($conn, $_POST['position_name'] ?? ''));
+    $salary  = (int)($_POST['base_salary'] ?? 0);
+    $desc    = trim(mysqli_real_escape_string($conn, $_POST['description'] ?? ''));
+    if ($name === '' || $salary <= 0) {
+        setNotify('error', 'Tên chức vụ và lương cơ bản là bắt buộc.');
+    } else {
+        mysqli_query($conn, "INSERT INTO positions (position_name, base_salary, description) VALUES ('$name', $salary, '$desc')");
+        setNotify('success', "Đã thêm chức vụ '$name'.");
+    }
+    header('Location: user_page.php?chucvu'); exit;
+}
+
+if (isset($_POST['edit_position'])) {
+    requirePermission(AppPermission::MANAGE_STAFF);
+    $pid    = (int)($_POST['position_id'] ?? 0);
+    $name   = trim(mysqli_real_escape_string($conn, $_POST['position_name'] ?? ''));
+    $salary = (int)($_POST['base_salary'] ?? 0);
+    $desc   = trim(mysqli_real_escape_string($conn, $_POST['description'] ?? ''));
+    $active = isset($_POST['is_active']) ? 1 : 0;
+    if ($pid > 0 && $name !== '' && $salary > 0) {
+        mysqli_query($conn, "UPDATE positions SET position_name='$name', base_salary=$salary,
+                              description='$desc', is_active=$active WHERE position_id=$pid");
+        setNotify('success', 'Đã cập nhật chức vụ.');
+    } else {
+        setNotify('error', 'Dữ liệu chức vụ không hợp lệ.');
+    }
+    header('Location: user_page.php?chucvu'); exit;
+}
+
+if (isset($_POST['change_employee_position'])) {
+    requirePermission(AppPermission::MANAGE_STAFF);
+    $acc_id  = (int)($_POST['account_id'] ?? 0);
+    $new_pos = (int)($_POST['new_position_id'] ?? 0);
+    $reason  = trim(mysqli_real_escape_string($conn, $_POST['change_reason'] ?? ''));
+    $date    = trim($_POST['change_date'] ?? date('Y-m-d'));
+    // Chặn gán chức vụ Quản trị viên (position_id=1) từ giao diện HR
+    if ($acc_id > 0 && $new_pos > 0 && $new_pos != 1) {
+        mysqli_query($conn, "UPDATE employee_positions_history SET end_date='$date'
+                              WHERE account_id=$acc_id AND end_date IS NULL");
+        mysqli_query($conn, "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason, created_by)
+                              VALUES ($acc_id, $new_pos, '$date', '$reason', " . currentUserId() . ")");
+        mysqli_query($conn, "UPDATE accounts SET position_id=$new_pos, role_id=$new_pos WHERE account_id=$acc_id");
+        setNotify('success', 'Đã đổi chức vụ nhân viên thành công.');
+    } elseif ($new_pos == 1) {
+        setNotify('error', 'Không thể gán chức vụ Quản trị viên từ giao diện nhân sự.');
+    }
+    header('Location: user_page.php?chucvu'); exit;
 }
 
 // =====================================================================

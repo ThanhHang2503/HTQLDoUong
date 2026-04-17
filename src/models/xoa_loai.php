@@ -1,16 +1,5 @@
 <?php
-
-if (isset($_GET['loai']) && $_GET['loai'] == 'xoa') {
-    try {
-        $id = $_GET['id'];
-        $sql = "delete from category where category_id=$id";
-        $result = mysqli_query($conn, $sql);
-        if ($result) {
-            echo "<script>alert('Xóa thành công');</script>";
-            echo "<script>window.location.href='user_page.php?loai';</script>";
-        }
-    } catch (Exception $e) {
-        echo "<script>confirm('Loại này đã tồn tại trong hóa đơn khác')</script>";
-        echo "<script>window.location.href='user_page.php?loai';</script>";
-    }
-}
+// Chức năng xóa loại sản phẩm đã bị vô hiệu hóa.
+$_SESSION['loai_error'] = 'Không được phép xóa loại sản phẩm.';
+header('location:user_page.php?loai');
+exit;

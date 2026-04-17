@@ -75,12 +75,29 @@ renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
             <?php if ($view === 'products') : ?>
                 <?php
                 renderAdminTable(
-                    ['Mã', 'Tên', 'Danh mục', 'Giá', 'Trạng thái', 'Ngày tạo'],
+                    ['Mã', 'Ảnh', 'Tên', 'Danh mục', 'Giá', 'Trạng thái', 'Ngày tạo'],
                     $products,
                     function (array $row): string {
                         $statusClass = $row['item_status'] === 'active' ? 'text-bg-success' : 'text-bg-secondary';
+                        
+                        // Đồng bộ logic hiển thị ảnh với src/views/sanpham.php
+                        $id_img   = 'img/' . (int)$row['item_id'] . '.jpg';
+                        $db_img   = trim((string)($row['item_image'] ?? ''));
+                        $fallback = 'img/' . (((int)$row['item_id'] % 13) + 1) . '.jpg';
+                        
+                        if (file_exists(__DIR__ . '/../' . $id_img)) {
+                            $img_src = $id_img;
+                        } elseif ($db_img !== '') {
+                            $img_src = $db_img;
+                        } else {
+                            $img_src = $fallback;
+                        }
+
+                        $imgHtml = '<img src="../' . htmlspecialchars($img_src) . '" width="80" height="80" class="rounded shadow-sm border" style="object-fit: cover;" onerror="this.src=\'../img/1.jpg\'">';
+                        
                         return '<tr>'
                             . '<td>' . (int) $row['item_id'] . '</td>'
+                            . '<td>' . $imgHtml . '</td>'
                             . '<td>' . adminText($row['item_name']) . '</td>'
                             . '<td>' . adminText($row['category_name'] ?? '-') . '</td>'
                             . '<td>' . adminMoney($row['unit_price']) . '</td>'

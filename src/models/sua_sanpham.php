@@ -48,8 +48,32 @@ $list_of_categories = $cat_rs ? mysqli_fetch_all($cat_rs, MYSQLI_ASSOC) : [];
                     <span class="float-end badge bg-light text-dark font-monospace"><?= htmlspecialchars($row['item_code'] ?? '') ?></span>
                 </div>
                 <div class="card-body">
-                    <form action="user_page.php?sanpham=sua" method="POST">
+                    <form action="user_page.php?sanpham=sua" method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="item_id" value="<?= (int)$row['item_id'] ?>">
+
+                        <!-- Hiển thị ảnh hiện tại -->
+                        <div class="text-center mb-3">
+                            <label class="fw-bold d-block mb-2">Ảnh hiện tại:</label>
+                            <?php 
+                            $id_img = 'img/' . (int)$row['item_id'] . '.jpg';
+                            $img_src = file_exists(__DIR__ . '/../../' . $id_img) ? $id_img : ($row['item_image'] ?: 'img/1.jpg');
+                            ?>
+                            <img src="<?= htmlspecialchars($img_src) ?>" 
+                                 width="60" height="60" 
+                                 class="rounded shadow-sm border" 
+                                 style="object-fit: cover;"
+                                 onerror="this.src='img/1.jpg'">
+                        </div>
+
+                        <!-- Input sửa ảnh -->
+                        <div class="form-group mt-3">
+                            <label for="item_image_file" class="fw-bold">
+                                <i class="fa-solid fa-image me-1 text-danger"></i>Thay đổi ảnh mới (tùy chọn):
+                            </label>
+                            <input type="file" class="form-control" id="item_image_file" name="item_image_file"
+                                   accept=".jpg,.jpeg,.png">
+                            <small class="text-muted">Để trống nếu muốn giữ nguyên ảnh cũ. Chỉ nhận JPG/PNG.</small>
+                        </div>
 
                         <div class="form-group mt-3">
                             <label for="item_name">Tên sản phẩm:</label>

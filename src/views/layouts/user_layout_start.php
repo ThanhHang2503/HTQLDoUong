@@ -75,7 +75,9 @@ if ($isManagerOrAdmin) {
     global $conn;
     $pc = mysqli_query($conn, "SELECT COUNT(*) FROM leave_requests WHERE status='chờ duyệt'");
     $pr = mysqli_query($conn, "SELECT COUNT(*) FROM resignation_requests WHERE status='chờ duyệt'");
-    $pending_count = ($pc ? (int)mysqli_fetch_row($pc)[0] : 0) + ($pr ? (int)mysqli_fetch_row($pr)[0] : 0);
+    $count_leave = ($pc && mysqli_num_rows($pc) > 0) ? (int)mysqli_fetch_row($pc)[0] : 0;
+    $count_resig = ($pr && mysqli_num_rows($pr) > 0) ? (int)mysqli_fetch_row($pr)[0] : 0;
+    $pending_count = $count_leave + $count_resig;
 }
 ?>
 

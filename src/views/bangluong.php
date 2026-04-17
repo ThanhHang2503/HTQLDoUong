@@ -67,8 +67,8 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
         }
     }
 
-    // 2. Lấy lịch sử chức vụ
-    $historySql = "SELECT eph.start_date, eph.end_date, p.base_salary
+    // 2. Lấy lịch sử chức vụ (Lấy thêm position_id để phân biệt)
+    $historySql = "SELECT eph.start_date, eph.end_date, p.base_salary, p.position_id
                    FROM employee_positions_history eph
                    JOIN positions p ON p.position_id = eph.position_id
                    WHERE eph.account_id = $accountId
@@ -80,7 +80,7 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
 
     // Nếu không có lịch sử, dùng chức vụ hiện tại
     if (empty($history)) {
-        $sql = "SELECT p.base_salary FROM accounts a 
+        $sql = "SELECT p.base_salary, p.position_id FROM accounts a 
                 JOIN positions p ON p.position_id = a.position_id 
                 WHERE a.account_id = $accountId";
         $cp_res = mysqli_query($conn, $sql);
@@ -88,7 +88,8 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
         $history[] = [
             'start_date' => '2000-01-01',
             'end_date' => '2099-12-31',
-            'base_salary' => $cp['base_salary'] ?? 0
+            'base_salary' => $cp['base_salary'] ?? 0,
+            'position_id' => $cp['position_id'] ?? 0
         ];
     }
 
@@ -111,31 +112,37 @@ function getProRatedBaseSalary($conn, $accountId, $month, $year) {
 
         if ($currentPos && !isset($unpaidLeaveDates[$dateStr])) {
             $sal = (int)$currentPos['base_salary'];
-            if (!isset($workingDaysByPos[$sal])) {
-                $workingDaysByPos[$sal] = ['days' => 0, 'base_salary' => $sal];
+            $pid = (int)$currentPos['position_id'];
+            if (!isset($workingDaysByPos[$pid])) {
+                $workingDaysByPos[$pid] = ['days' => 0, 'base_salary' => $sal, 'position_id' => $pid];
             }
-            $workingDaysByPos[$sal]['days']++;
+            $workingDaysByPos[$pid]['days']++;
             $totalWorkingDays++;
         }
     }
 
     $finalBaseSalary = 0;
-    if ($totalWorkingDays >= 28) {
-        $weightedSum = 0;
-        foreach ($workingDaysByPos as $pos) {
-            $weightedSum += ($pos['days'] / $totalWorkingDays) * $pos['base_salary'];
-        }
-        $finalBaseSalary = $weightedSum;
-    } else {
+    $distinctPositionsCount = count($workingDaysByPos);
+
+    if ($distinctPositionsCount >= 2) {
+        // TRƯỜNG HỢP ≥ 2 CHỨC VỤ: Tính theo tỷ lệ ngày làm thực tế (chia 30), không áp dụng 28 ngày
         foreach ($workingDaysByPos as $pos) {
             $finalBaseSalary += ($pos['days'] * $pos['base_salary'] / 30);
+        }
+    } elseif ($distinctPositionsCount === 1) {
+        // TRƯỜNG HỢP 1 CHỨC VỤ: Áp dụng định mức 28 ngày
+        $pos = reset($workingDaysByPos); // Lấy chức vụ duy nhất
+        if ($totalWorkingDays >= 28) {
+            $finalBaseSalary = $pos['base_salary'];
+        } else {
+            $finalBaseSalary = ($totalWorkingDays * $pos['base_salary'] / 30);
         }
     }
 
     return [
         'total' => round($finalBaseSalary),
         'working_days' => $totalWorkingDays,
-        'is_prorated' => ($totalWorkingDays < 28 || count($workingDaysByPos) > 1)
+        'is_prorated' => ($distinctPositionsCount >= 2 || ($distinctPositionsCount === 1 && $totalWorkingDays < 28))
     ];
 }
 

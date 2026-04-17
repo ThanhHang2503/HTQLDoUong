@@ -32,9 +32,7 @@ $ds_loai = mysqli_fetch_all($ds_loai);
                     <td><?= $lo[1] ?></td>
                     <?php
                     if (can(AppPermission::MANAGE_CATALOG))
-                        echo '<td><a href="user_page.php?loai=sua&id=' . $lo[0] . '"><i class="btn btn-outline-success fa-solid fa-pen"></i> </a>
-                        <a href="user_page.php?loai=xoa&id=' . $lo[0] . '"><i class="btn btn-outline-danger fa-solid fa-trash"></i></a></td>';
-
+                        echo '<td><a href="user_page.php?loai=sua&id=' . $lo[0] . '"><i class="btn btn-outline-success fa-solid fa-pen"></i> </a></td>';
                     ?>
                 </tr>
             <?php endforeach; ?>

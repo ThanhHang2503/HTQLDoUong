@@ -94,7 +94,7 @@ function adminFetchProducts(mysqli $conn, array $filters): array
         'code' => 'i.item_id',
     ], $sort, $direction, 'i.added_date');
 
-    $sql = "SELECT i.item_id, i.item_name, i.description, i.unit_price, i.added_date, i.item_status, c.category_id, c.category_name
+    $sql = "SELECT i.item_id, i.item_name, i.description, i.unit_price, i.added_date, i.item_status, i.item_image, c.category_id, c.category_name
             FROM items i
             LEFT JOIN category c ON c.category_id = i.category_id";
 
