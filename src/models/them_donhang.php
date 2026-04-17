@@ -20,15 +20,12 @@ if (isset($_GET['donhang']) && $_GET['donhang'] == 'them') :
     <style>
         #sale-panel {
             height: 70vh;
+            overflow: hidden;
         }
 
         #panel-left,
         #item-list {
             background: rgb(255 255 255 / 17%);
-        }
-
-        #item-list {
-            height: 60%;
         }
 
         /* Custom Scrollable Tabs */
@@ -54,6 +51,35 @@ if (isset($_GET['donhang']) && $_GET['donhang'] == 'them') :
             margin: 0 2px;
             padding: 5px 15px;
             border-radius: 20px;
+        }
+
+        /* Panel right: flexbox column - 1 scroll duy nhất */
+        #panel-right {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        #panel-right-header {
+            flex-shrink: 0;
+        }
+        #cart-table-wrapper {
+            flex: 1 1 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+        }
+        #cart-footer {
+            flex-shrink: 0;
+            border-top: 1px solid #dee2e6;
+            background: #fff;
+            padding: 12px 16px;
+        }
+        #cart-footer .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
         }
     </style>
     <div class="px-2 mt-2 py-3">
@@ -175,14 +201,14 @@ if (isset($_GET['donhang']) && $_GET['donhang'] == 'them') :
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="col-lg-5 bg-white position-relative" id="panel-right" style="height: 100%;">
-                                        <!-- Header (Approx 40px high) -->
+                                    <div class="col-lg-5 bg-white" id="panel-right">
+                                        <!-- Header -->
                                         <div class="p-2 bg-secondary text-white fw-bold" id="panel-right-header">
                                             <i class="fa-solid fa-cart-shopping me-2"></i>SẢN PHẨM ĐÃ CHỌN
                                         </div>
-                                        
-                                        <!-- Scrollable Table Container -->
-                                        <div style="height: calc(100% - 170px); overflow-y: auto; overflow-x: hidden;">
+
+                                        <!-- Scrollable Table Container (1 scroll duy nhất) -->
+                                        <div id="cart-table-wrapper">
                                             <table id="product-list" class="table table-sm table-hover mb-0">
                                                 <thead class="bg-light sticky-top">
                                                     <tr class="small text-uppercase">
@@ -198,11 +224,11 @@ if (isset($_GET['donhang']) && $_GET['donhang'] == 'them') :
                                                 </tbody>
                                             </table>
                                         </div>
-                                        
-                                        <!-- Fixed Footer (Approx 130px high) -->
-                                        <div class="p-3 border-top bg-white shadow-lg" style="position: absolute; bottom: 0; left: 0; right: 0; height: 130px; z-index: 10;">
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <span class="fw-bold text-dark">TỔNG TIỀN:</span>
+
+                                        <!-- Footer: Tổng tiền + nút, luôn hiển thị, ngoài vùng scroll -->
+                                        <div id="cart-footer">
+                                            <div class="total-row">
+                                                <span class="fw-bold text-dark fs-6">TỔNG TIỀN:</span>
                                                 <div class="h4 mb-0 fw-bolder text-danger"><span id="total">0</span>đ</div>
                                             </div>
                                             <div class="row g-2">
