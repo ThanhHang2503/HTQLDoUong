@@ -6,31 +6,56 @@ require_once __DIR__ . '/src/models/authorization.php';
 
 if (isset($_POST['submit'])) {
    $email = mysqli_real_escape_string($conn, $_POST['email']);
-   $pass = md5($_POST['password']);
-   $select = "SELECT a.account_id, a.full_name, r.name AS role_name, a.system_status
+   $password_input = $_POST['password'];
+
+   $select = "SELECT a.account_id, a.full_name, a.password as stored_hash, r.name AS role_name, a.system_status
               FROM accounts a
               JOIN roles r ON r.id = a.role_id
-              WHERE a.email = '$email' AND a.password = '$pass'";
+              WHERE a.email = '$email'";
 
    $result = mysqli_query($conn, $select);
-   if (mysqli_num_rows($result) > 0) {
-      $row = mysqli_fetch_array($result);
+   if ($row = mysqli_fetch_assoc($result)) {
+      $stored_hash = $row['stored_hash'];
+      $authenticated = false;
+      $needs_upgrade = false;
 
-      if ($row['system_status'] === 'pending') {
-         $error[] = 'Tài khoản chưa được kích hoạt. Vui lòng chờ Admin phê duyệt!';
-      } else if ($row['system_status'] !== 'active') {
-         $error[] = 'Tài khoản của bạn đã bị khóa hoặc vô hiệu hóa!';
-      } else {
-         session_unset();
-         $_SESSION['account_id'] = (int) $row['account_id'];
-         $_SESSION['role_name'] = $row['role_name'];
-         $_SESSION['full_name'] = $row['full_name'];
-         if ($row['role_name'] === AppRole::ADMIN) {
-            header('location:admin/index.php');
+      // 1. Kiểm tra theo chuẩn bảo mật mới (password_hash)
+      if (password_verify($password_input, $stored_hash)) {
+         $authenticated = true;
+      } 
+      // 2. Fallback cho tài khoản cũ (MD5) - Tự động nâng cấp hash
+      else if (md5($password_input) === $stored_hash) {
+         $authenticated = true;
+         $needs_upgrade = true;
+      }
+
+      if ($authenticated) {
+         if ($row['system_status'] === 'pending') {
+            $error[] = 'Tài khoản chưa được kích hoạt. Vui lòng chờ Admin phê duyệt!';
+         } else if ($row['system_status'] !== 'active') {
+            $error[] = 'Tài khoản của bạn đã bị khóa hoặc vô hiệu hóa!';
          } else {
-            header('location:user_page.php?home');
+            // Nâng cấp mật khẩu lên hash mới nếu là MD5
+            if ($needs_upgrade) {
+               $new_hash = password_hash($password_input, PASSWORD_DEFAULT);
+               $update_sql = "UPDATE accounts SET password = '$new_hash' WHERE account_id = " . $row['account_id'];
+               mysqli_query($conn, $update_sql);
+            }
+
+            session_unset();
+            $_SESSION['account_id'] = (int) $row['account_id'];
+            $_SESSION['role_name'] = $row['role_name'];
+            $_SESSION['full_name'] = $row['full_name'];
+            
+            if ($row['role_name'] === AppRole::ADMIN) {
+               header('location:admin/index.php');
+            } else {
+               header('location:user_page.php?home');
+            }
+            exit;
          }
-         exit;
+      } else {
+         $error[] = 'Sai email hoặc mật khẩu!';
       }
    } else {
       $error[] = 'Sai email hoặc mật khẩu!';

@@ -41,19 +41,32 @@ if (isset($_POST['update_profile'])) {
 
 // Đổi mật khẩu
 if (isset($_POST['change_password'])) {
-    $old_pass = md5($_POST['old_password'] ?? '');
+    $password_input = $_POST['old_password'] ?? '';
     $new_pass = trim($_POST['new_password'] ?? '');
     $cnf_pass = trim($_POST['confirm_password'] ?? '');
 
-    $chk = mysqli_query($conn, "SELECT account_id FROM accounts WHERE account_id=$uid AND password='$old_pass'");
-    if (mysqli_num_rows($chk) === 0) {
+    // Lấy hash hiện tại từ database
+    $chk = mysqli_query($conn, "SELECT password FROM accounts WHERE account_id=$uid");
+    $row = mysqli_fetch_assoc($chk);
+    $stored_hash = $row['password'] ?? '';
+
+    $old_verified = false;
+    // Kiểm tra mật khẩu cũ (hỗ trợ cả BCRYPT và MD5)
+    if (password_verify($password_input, $stored_hash)) {
+        $old_verified = true;
+    } else if (md5($password_input) === $stored_hash) {
+        $old_verified = true;
+    }
+
+    if (!$old_verified) {
         setNotify('error', 'Mật khẩu hiện tại không đúng.');
     } elseif (strlen($new_pass) < 6) {
         setNotify('error', 'Mật khẩu mới phải có ít nhất 6 ký tự.');
     } elseif ($new_pass !== $cnf_pass) {
         setNotify('error', 'Xác nhận mật khẩu không khớp.');
     } else {
-        $np = md5($new_pass);
+        // Mã hóa mật khẩu mới bằng BCRYPT
+        $np = password_hash($new_pass, PASSWORD_DEFAULT);
         mysqli_query($conn, "UPDATE accounts SET password='$np' WHERE account_id=$uid");
         setNotify('success', 'Đổi mật khẩu thành công!');
     }

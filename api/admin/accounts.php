@@ -54,120 +54,57 @@ try {
             echo json_encode(['success' => false, 'message' => 'Bạn không có quyền thêm tài khoản mới']);
             exit;
         }
-        $data = json_decode(file_get_contents('php://input'), true);
-        $full_name = trim(mysqli_real_escape_string($conn, $data['full_name'] ?? ''));
-        $email = trim(mysqli_real_escape_string($conn, $data['email'] ?? ''));
-        $password = trim($data['password'] ?? '');
-        $position_id = (int)($data['position_id'] ?? 0);
-        $role_id = $position_id; // Thống nhất Vai trò = Chức vụ
+
+        $input = json_decode(file_get_contents('php://input'), true);
         
-        $phone = trim(mysqli_real_escape_string($conn, $data['phone'] ?? ''));
-        $address = trim(mysqli_real_escape_string($conn, $data['address'] ?? ''));
-        $birth_date = !empty($data['birth_date']) ? "'".mysqli_real_escape_string($conn, $data['birth_date'])."'" : "NULL";
-        $gender = mysqli_real_escape_string($conn, $data['gender'] ?? 'nam');
-        $hire_date = !empty($data['hire_date']) ? "'".mysqli_real_escape_string($conn, $data['hire_date'])."'" : "CURDATE()";
-        $position_id = (int)($data['position_id'] ?? 0);
-
-        if (!$full_name || !$email || !$password || !$position_id) {
-            echo json_encode(['success' => false, 'message' => 'Vui lòng cung cấp đầy đủ thông tin']);
-            exit;
-        }
-
         // Không cho phép thêm Admin qua giao diện nhân sự
-        if ($role_id == 1) {
+        if (($input['position_id'] ?? 0) == 1) {
             echo json_encode(['success' => false, 'message' => 'Không được phép tạo tài khoản Quản trị viên tại đây']);
             exit;
         }
 
-        // Check trùng email
-        $check = mysqli_query($conn, "SELECT account_id FROM accounts WHERE email = '$email'");
-        if (mysqli_num_rows($check) > 0) {
-            echo json_encode(['success' => false, 'message' => 'Email đã tồn tại trong hệ thống']);
-            exit;
-        }
+        // Quyết định trạng thái hệ thống: Manager thêm => pending, Admin thêm => active
+        $input['system_status'] = (currentRole() === AppRole::ADMIN) ? 'active' : 'pending';
 
-        $hashed_password = md5($password);
-        $hr_status = 'active'; 
+        // Gọi Service xử lý tập trung
+        $result = $employeeService->createEmployee($input);
         
-        $system_status = (currentRole() === AppRole::ADMIN) ? 'active' : 'pending';
-
-        $sql = "INSERT INTO accounts (full_name, email, password, role_id, hr_status, system_status, phone, address, birth_date, gender, hire_date, position_id) 
-                VALUES ('$full_name', '$email', '$hashed_password', $role_id, '$hr_status', '$system_status', '$phone', '$address', $birth_date, '$gender', $hire_date, " . ($position_id > 0 ? $position_id : "NULL") . ")";
-        
-        if (mysqli_query($conn, $sql)) {
-            $new_id = mysqli_insert_id($conn);
-            // Position initialization removed here to enforce centralization in chucvu module.
-            echo json_encode(['success' => true, 'message' => 'Thêm tài khoản thành công', 'id' => $new_id]);
+        if ($result['success']) {
+            echo json_encode(['success' => true, 'message' => 'Thêm tài khoản thành công', 'id' => $result['account_id']]);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Đã xảy ra lỗi khi thêm tài khoản', 'error' => mysqli_error($conn)]);
+            echo json_encode(['success' => false, 'message' => $result['error']]);
         }
         exit;
     }
 
     if ($method === 'PUT') {
-        $data = json_decode(file_get_contents('php://input'), true);
-        $account_id = (int)($data['account_id'] ?? 0);
-        $full_name = trim(mysqli_real_escape_string($conn, $data['full_name'] ?? ''));
-        $email = trim(mysqli_real_escape_string($conn, $data['email'] ?? ''));
-        $password = trim($data['password'] ?? '');
-        $position_id = (int)($data['position_id'] ?? 0);
-        $role_id = $position_id; // Thống nhất Vai trò = Chức vụ
-        
-        $phone = trim(mysqli_real_escape_string($conn, $data['phone'] ?? ''));
-        $address = trim(mysqli_real_escape_string($conn, $data['address'] ?? ''));
-        $birth_date = !empty($data['birth_date']) ? "'".mysqli_real_escape_string($conn, $data['birth_date'])."'" : "NULL";
-        $gender = mysqli_real_escape_string($conn, $data['gender'] ?? 'nam');
-        $hire_date = !empty($data['hire_date']) ? "'".mysqli_real_escape_string($conn, $data['hire_date'])."'" : "CURDATE()";
-        $position_id = (int)($data['position_id'] ?? 0);
+        $input = json_decode(file_get_contents('php://input'), true);
+        $account_id = (int)($input['account_id'] ?? 0);
 
-        if ($account_id <= 0 || !$full_name || !$email || !$position_id) {
-            echo json_encode(['success' => false, 'message' => 'Dữ liệu không hợp lệ']);
+        if ($account_id <= 0) {
+            echo json_encode(['success' => false, 'message' => 'ID tài khoản không hợp lệ']);
             exit;
         }
 
-        // Không cho phép chuyển sang Admin qua giao diện nhân sự
-        if ($role_id == 1) {
-            echo json_encode(['success' => false, 'message' => 'Không được phép cấp quyền Quản trị viên tại đây']);
-            exit;
-        }
-
+        // Chặn tự sửa chính mình qua API nhân sự
         if ($account_id === currentUserId()) {
             echo json_encode(['success' => false, 'message' => 'Bạn không thể tự sửa thông tin phân quyền của chính mình qua chức năng này']);
             exit;
         }
 
-        // Check trùng email nhưng bỏ qua email của chính tài khoản này
-        $check = mysqli_query($conn, "SELECT account_id FROM accounts WHERE email = '$email' AND account_id != $account_id");
-        if (mysqli_num_rows($check) > 0) {
-            echo json_encode(['success' => false, 'message' => 'Email đã được sử dụng bởi tài khoản khác']);
+        // Chặn cấp quyền Admin
+        if (($input['position_id'] ?? 0) == 1) {
+            echo json_encode(['success' => false, 'message' => 'Không được phép cấp quyền Quản trị viên tại đây']);
             exit;
         }
 
-        $password_sql = "";
-        if ($password !== '') {
-            $hashed_password = md5($password);
-            $password_sql = ", password = '$hashed_password'";
-        }
-
-        // Phân quyền: Chỉ Admin mới được đổi role/position
-        // Đồng bộ role_id = position_id để đảm bảo nhất quán (Plan 2)
-        $role_sql = "";
-        if (currentRole() === AppRole::ADMIN) {
-            $role_sql = ", role_id = $role_id";
-        }
-
-        $sql = "UPDATE accounts 
-                SET full_name = '$full_name', email = '$email', phone = '$phone', address = '$address', 
-                    birth_date = $birth_date, gender = '$gender', hire_date = $hire_date,
-                    position_id = " . ($position_id > 0 ? $position_id : "NULL") . "
-                    $role_sql $password_sql 
-                WHERE account_id = $account_id";
+        // Gọi Service xử lý tập trung
+        $result = $employeeService->updateEmployee($account_id, $input);
         
-        if (mysqli_query($conn, $sql)) {
-            // Position update logic removed here to enforce centralization in chucvu module.
+        if ($result['success']) {
             echo json_encode(['success' => true, 'message' => 'Cập nhật tài khoản thành công']);
         } else {
-            echo json_encode(['success' => false, 'message' => 'Lỗi cập nhật', 'error' => mysqli_error($conn)]);
+            echo json_encode(['success' => false, 'message' => $result['error']]);
         }
         exit;
     }

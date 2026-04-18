@@ -168,7 +168,25 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
     </div>
 </div>
 
-<!-- Modal Thông báo kết quả (Modal Thông báo) removed - now handled in chucvu.php -->
+<!-- Modal Thông báo kết quả -->
+<div class="modal fade" id="modalResult" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header" id="resultHeader">
+                <h5 class="modal-title fw-bold" id="resultTitle">Thông báo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="fs-1 mb-3" id="resultIcon"></div>
+                <h5 id="resultMsg" class="fw-bold mb-2"></h5>
+                <p id="resultDetails" class="text-muted small mb-0"></p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center pt-0">
+                <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Đã hiểu</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -179,6 +197,7 @@ const currentRole = '<?= currentRole() ?>';
 
 var modalAccount = null;
 var modalToggle = null;
+var modalResult = null;
 const apiUrl = 'api/admin/accounts.php';
 
 // Format status badge
@@ -206,7 +225,7 @@ async function loadAccounts() {
             renderTable();
             renderPositionsOptions();
         } else {
-            alert('Lỗi tải dữ liệu: ' + data.message);
+            showResult(false, 'Lỗi tải dữ liệu', data.message);
         }
     } catch (error) {
         console.error('Fetch error:', error);
@@ -314,7 +333,7 @@ function setModalReadOnly(isReadOnly) {
 
 function resetForm() {
     document.getElementById('formAccount').reset();
-    document.getElementById('ac_account_id').value = '';
+    document.getElementById('ac_account_id').value = 0; // Đảm bảo là 0 cho add mới
     document.getElementById('ac_position_id').disabled = false; // Mở lại khi add mới
     setModalReadOnly(false);
 }
@@ -433,7 +452,7 @@ async function fetchHistory(id) {
             } else {
                 data.data.forEach(h => {
                     const tr = document.createElement('tr');
-                    const endDateStr = h.end_date ? formatDate(h.end_date) : '<span class="badge text-bg-success">Hiện tại</span>';
+                    const endDateStr = h.end_date ? formatDate(h.end_date) : '<span class="badge text-bg-success">...</span>';
                     tr.innerHTML = `
                         <td><b>${h.position_name}</b><br><small class="text-muted">${h.reason || ''}</small></td>
                         <td>${formatDate(h.start_date)}</td>
@@ -486,12 +505,13 @@ async function saveAccount(e) {
         
         if (result.success) {
             if (modalAccount) modalAccount.hide();
+            showResult(true, 'Thành công', id > 0 ? 'Cập nhật tài khoản thành công.' : 'Tạo tài khoản mới thành công.');
             await loadAccounts(); // Tải lại bảng
         } else {
-            alert('Lỗi: ' + result.message);
+            showResult(false, 'Thất bại', result.message || result.error);
         }
     } catch (err) {
-        alert('Lỗi kết nối mạng: ' + err);
+        showResult(false, 'Lỗi kết nối', 'Không thể kết nối tới máy chủ.');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Lưu thông tin';
@@ -544,12 +564,13 @@ async function executeToggle() {
         
         if (result.success) {
             if (modalToggle) modalToggle.hide();
+            showResult(true, 'Thành công', 'Đã thay đổi trạng thái thành công.');
             await loadAccounts();
         } else {
-            alert('Lỗi: ' + result.message);
+            showResult(false, 'Thất bại', result.message || result.error);
         }
     } catch (err) {
-        alert('Lỗi kết nối mạng: ' + err);
+        showResult(false, 'Lỗi kết nối', 'Không thể kết nối tới máy chủ.');
     }
 }
 
@@ -558,9 +579,31 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof bootstrap !== 'undefined') {
         modalAccount = new bootstrap.Modal(document.getElementById('modalAccount'));
         modalToggle = new bootstrap.Modal(document.getElementById('modalToggleStatus'));
+        modalResult = new bootstrap.Modal(document.getElementById('modalResult'));
     }
     loadAccounts();
 });
+
+function showResult(success, title, msg) {
+    const header = document.getElementById('resultHeader');
+    const titleEl = document.getElementById('resultTitle');
+    const msgEl = document.getElementById('resultMsg');
+    const iconEl = document.getElementById('resultIcon');
+
+    if (success) {
+        header.className = "modal-header text-bg-success border-0";
+        titleEl.innerText = title;
+        msgEl.innerText = msg;
+        iconEl.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i>';
+    } else {
+        header.className = "modal-header text-bg-danger border-0";
+        titleEl.innerText = title;
+        msgEl.innerText = msg;
+        iconEl.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger"></i>';
+    }
+
+    if (modalResult) modalResult.show();
+}
 </script>
 </div>
 </div>

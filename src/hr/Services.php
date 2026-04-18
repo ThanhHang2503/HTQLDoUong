@@ -65,49 +65,169 @@ class EmployeeService {
 
     /**
      * Tạo nhân viên mới
+     * 
+     * @param array $data Dữ liệu nhân viên (full_name, email, password, position_id, ...)
+     * @return array Kết quả xử lý
      */
     public function createEmployee(array $data): array {
-        $name = mysqli_real_escape_string($this->conn, $data['full_name']);
-        $email = mysqli_real_escape_string($this->conn, $data['email']);
-        $pass = md5($data['password'] ?? '123');
-        $role_id = (int)($data['role_id'] ?? 3); // sales by default
-        $hire_date = mysqli_real_escape_string($this->conn, $data['hire_date'] ?? date('Y-m-d'));
+        // 1. Validate & Escape cơ bản
+        $full_name = trim(mysqli_real_escape_string($this->conn, $data['full_name'] ?? ''));
+        $email = trim(mysqli_real_escape_string($this->conn, $data['email'] ?? ''));
+        $password = $data['password'] ?? '';
+        $position_id = (int)($data['position_id'] ?? 0);
         
-        $query = "INSERT INTO accounts (full_name, email, password, role_id, position_id, status, hire_date) 
-                  VALUES ('$name', '$email', '$pass', $role_id, $position_id, 'active', '$hire_date')";
+        if (!$full_name || !$email || !$password || !$position_id) {
+            return ['success' => false, 'error' => 'Vui lòng cung cấp đầy đủ thông tin bắt buộc (Tên, Email, Mật khẩu, Chức vụ).'];
+        }
+
+        // 2. Kiểm tra email đã tồn tại hay chưa
+        $check_query = "SELECT account_id FROM accounts WHERE email = '$email'";
+        $check_result = mysqli_query($this->conn, $check_query);
+        if (mysqli_num_rows($check_result) > 0) {
+            return ['success' => false, 'error' => 'Email đã tồn tại trong hệ thống.'];
+        }
+
+        // 3. Chuẩn hóa dữ liệu phụ
+        $phone = trim(mysqli_real_escape_string($this->conn, $data['phone'] ?? ''));
+        $address = trim(mysqli_real_escape_string($this->conn, $data['address'] ?? ''));
+        $gender = in_array($data['gender'] ?? '', ['nam', 'nữ', 'khác']) ? $data['gender'] : 'nam';
+        
+        // Chuẩn hóa ngày sinh
+        $birth_date = !empty($data['birth_date']) ? "'" . mysqli_real_escape_string($this->conn, $data['birth_date']) . "'" : "NULL";
+        
+        // Chuẩn hóa ngày vào làm (Backend handles default)
+        $hire_date_val = !empty($data['hire_date']) ? $data['hire_date'] : date('Y-m-d');
+        $hire_date = "'" . mysqli_real_escape_string($this->conn, $hire_date_val) . "'";
+
+        // 4. Đồng bộ Role và Status
+        $role_id = $position_id; // Thống nhất Vai trò = Chức vụ cho 1-4
+        $system_status = mysqli_real_escape_string($this->conn, $data['system_status'] ?? 'active');
+        $hr_status = 'active';
+
+        // 5. Bảo mật: Mã hóa password bằng BCRYPT (Không dùng MD5)
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+        // 6. Thực hiện INSERT
+        $query = "INSERT INTO accounts (
+                    full_name, email, password, role_id, position_id, 
+                    phone, address, birth_date, gender, 
+                    hire_date, system_status, hr_status
+                  ) VALUES (
+                    '$full_name', '$email', '$hashed_password', $role_id, $position_id, 
+                    '$phone', '$address', $birth_date, '$gender', 
+                    $hire_date, '$system_status', '$hr_status'
+                  )";
         
         if (mysqli_query($this->conn, $query)) {
             $account_id = (int)mysqli_insert_id($this->conn);
             
-            // Create initial position history
+            // 7. Khởi tạo lịch sử chức vụ ban đầu
             $hist = new PositionHistory([
                 'account_id' => $account_id,
                 'position_id' => $position_id,
-                'start_date' => $hire_date,
+                'start_date' => $hire_date_val,
             ]);
             $this->posHistRepo->create($hist);
             
             return ['success' => true, 'account_id' => $account_id];
         }
         
-        return ['success' => false, 'error' => 'Không thể tạo nhân viên'];
+        // Xử lý lỗi trùng lặp (nếu có race condition)
+        if (mysqli_errno($this->conn) == 1062) {
+            return ['success' => false, 'error' => 'Email đã tồn tại trong hệ thống.'];
+        }
+
+        return ['success' => false, 'error' => 'Không thể tạo nhân viên: ' . mysqli_error($this->conn)];
     }
 
     /**
-     * Cập nhật thông tin nhân viên
+     * Cập nhật thông tin nhân viên (Hỗ trợ Partial Update)
      */
     public function updateEmployee(int $account_id, array $data): array {
         $aid = (int)$account_id;
-        $name = mysqli_real_escape_string($this->conn, $data['full_name']);
-        $email = mysqli_real_escape_string($this->conn, $data['email']);
-        
-        $query = "UPDATE accounts SET full_name = '$name', email = '$email' WHERE account_id = $aid";
+        $updates = [];
+
+        // 1. Kiểm tra tồn tại
+        $current = $this->getEmployee($aid);
+        if (!$current) {
+            return ['success' => false, 'error' => 'Không tìm thấy tài khoản nhân viên.'];
+        }
+
+        // 2. Kiểm tra email nếu có thay đổi
+        if (!empty($data['email']) && $data['email'] !== $current['email']) {
+            $email = mysqli_real_escape_string($this->conn, $data['email']);
+            $check = mysqli_query($this->conn, "SELECT account_id FROM accounts WHERE email = '$email' AND account_id != $aid");
+            if (mysqli_num_rows($check) > 0) {
+                return ['success' => false, 'error' => 'Email đã tồn tại trong hệ thống.'];
+            }
+            $updates[] = "email = '$email'";
+        }
+
+        // 3. Xử lý các trường thông tin cơ bản (Nếu có trong $data)
+        if (isset($data['full_name'])) {
+            $val = mysqli_real_escape_string($this->conn, trim($data['full_name']));
+            if ($val !== '') $updates[] = "full_name = '$val'";
+        }
+
+        if (isset($data['phone'])) {
+            $val = mysqli_real_escape_string($this->conn, trim($data['phone']));
+            $updates[] = "phone = '$val'";
+        }
+
+        if (isset($data['address'])) {
+            $val = mysqli_real_escape_string($this->conn, trim($data['address']));
+            $updates[] = "address = '$val'";
+        }
+
+        if (isset($data['gender'])) {
+            $val = in_array($data['gender'], ['nam', 'nữ', 'khác']) ? $data['gender'] : 'nam';
+            $updates[] = "gender = '$val'";
+        }
+
+        if (isset($data['birth_date'])) {
+            $val = !empty($data['birth_date']) ? "'" . mysqli_real_escape_string($this->conn, $data['birth_date']) . "'" : "NULL";
+            $updates[] = "birth_date = $val";
+        }
+
+        if (isset($data['hire_date'])) {
+            $val = !empty($data['hire_date']) ? "'" . mysqli_real_escape_string($this->conn, $data['hire_date']) . "'" : "CURDATE()";
+            $updates[] = "hire_date = $val";
+        }
+
+        if (isset($data['system_status'])) {
+            $val = mysqli_real_escape_string($this->conn, $data['system_status']);
+            $updates[] = "system_status = '$val'";
+        }
+
+        // 4. Xử lý Chức vụ & Role (Đồng bộ)
+        if (!empty($data['position_id'])) {
+            $pid = (int)$data['position_id'];
+            $updates[] = "position_id = $pid";
+            $updates[] = "role_id = $pid"; // Sync Role
+        }
+
+        // 5. Bảo mật: Chỉ update password nếu được cung cấp
+        if (!empty($data['password'])) {
+            $hashed = password_hash($data['password'], PASSWORD_DEFAULT);
+            $updates[] = "password = '$hashed'";
+        }
+
+        if (empty($updates)) {
+            return ['success' => true, 'message' => 'Không có thông tin nào cần cập nhật.'];
+        }
+
+        // 6. Thực thi UPDATE
+        $query = "UPDATE accounts SET " . implode(', ', $updates) . " WHERE account_id = $aid";
         
         if (mysqli_query($this->conn, $query)) {
             return ['success' => true];
         }
         
-        return ['success' => false, 'error' => 'Lỗi cập nhật'];
+        if (mysqli_errno($this->conn) == 1062) {
+            return ['success' => false, 'error' => 'Email đã tồn tại trong hệ thống.'];
+        }
+
+        return ['success' => false, 'error' => 'Lỗi cập nhật: ' . mysqli_error($this->conn)];
     }
 
     /**
@@ -325,8 +445,11 @@ class SalaryService {
      */
     public function calculateSalary(int $account_id, int $month, int $year, 
                                     int $allowance = 0, int $bonus = 0, int $deductions = 0): array {
-        // Get current position
-        $query = "SELECT position_id FROM accounts WHERE account_id = $account_id";
+        // Get employee info (including hire/resignation dates)
+        $aid = (int)$account_id;
+        $query = "SELECT a.position_id, a.hire_date, a.resignation_date 
+                  FROM accounts a 
+                  WHERE a.account_id = $aid";
         $result = mysqli_query($this->conn, $query);
         $row = mysqli_fetch_assoc($result);
         
@@ -340,14 +463,59 @@ class SalaryService {
         if (!$position) {
             return ['success' => false, 'error' => 'Không tìm thấy chức vụ'];
         }
-        
+
         $base_salary = $position->base_salary;
-        $total = $base_salary + $allowance + $bonus - $deductions;
+        $days_in_month = (int)date('t', strtotime("$year-$month-01"));
+        $effective_days = 30; // Standard month logic as requested
+
+        // 1. Check Resignation Pro-rating
+        if ($row['resignation_date']) {
+            $res_date = $row['resignation_date'];
+            $res_month = (int)date('m', strtotime($res_date));
+            $res_year = (int)date('Y', strtotime($res_date));
+            
+            if ($res_year < $year || ($res_year == $year && $res_month < $month)) {
+                // Already resigned in past month
+                $effective_days = 0;
+            } elseif ($res_year == $year && $res_month == $month) {
+                // Resignation month
+                $res_day = (int)date('d', strtotime($res_date));
+                $effective_days = $res_day - 1; // Worked until day before resignation
+                if ($effective_days < 0) $effective_days = 0;
+            }
+        }
+
+        // 2. Check Hire Date Pro-rating (if not already resigned/0 days)
+        if ($effective_days > 0 && $row['hire_date']) {
+            $h_date = $row['hire_date'];
+            $h_month = (int)date('m', strtotime($h_date));
+            $h_year = (int)date('Y', strtotime($h_date));
+            
+            if ($h_year == $year && $h_month == $month) {
+                // Hire month pro-rating
+                $h_day = (int)date('d', strtotime($h_date));
+                $worked_from_hire = 31 - $h_day; // e.g. hired on 30th -> 1 day, hired on 1st -> 30 days
+                if ($worked_from_hire < $effective_days) {
+                    $effective_days = $worked_from_hire;
+                }
+            } elseif ($h_year > $year || ($h_year == $year && $h_month > $month)) {
+                // Not yet hired
+                $effective_days = 0;
+            }
+        }
+
+        // Cap effective days at 30
+        if ($effective_days > 30) $effective_days = 30;
+        
+        $pro_rated_base = round(($effective_days / 30) * $base_salary);
+        $total = $pro_rated_base + $allowance + $bonus - $deductions;
         
         return [
             'success' => true,
             'position_id' => $position_id,
             'base_salary' => $base_salary,
+            'effective_days' => $effective_days,
+            'pro_rated_base' => $pro_rated_base,
             'allowance' => $allowance,
             'bonus' => $bonus,
             'deductions' => $deductions,
@@ -535,10 +703,40 @@ class ResignationService {
      * Duyệt yêu cầu nghỉ việc
      */
     public function approveResignation(int $request_id, int $approved_by): array {
-        if ($this->resignRepo->approve($request_id, $approved_by)) {
-            return ['success' => true, 'message' => 'Chấp thuận yêu cầu nghỉ việc'];
+        mysqli_begin_transaction($this->conn);
+        try {
+            // 1. Get request info
+            $rid = (int)$request_id;
+            $q = mysqli_query($this->conn, "SELECT account_id, effective_date FROM resignation_requests WHERE resignation_request_id = $rid");
+            $request = mysqli_fetch_assoc($q);
+            
+            if (!$request) throw new \Exception("Không tìm thấy yêu cầu nghỉ việc.");
+            
+            $aid = (int)$request['account_id'];
+            $effective_date = $request['effective_date'];
+            $app_by = (int)$approved_by;
+
+            // 2. Update request status
+            $u1 = "UPDATE resignation_requests SET status = 'chấp thuận', 
+                   approved_by = $app_by, approved_at = NOW() 
+                   WHERE resignation_request_id = $rid";
+            if (!mysqli_query($this->conn, $u1)) throw new \Exception("Lỗi cập nhật yêu cầu.");
+
+            // 3. Update account status and offboarding info
+            $u2 = "UPDATE accounts SET 
+                   hr_status = 'resigned', 
+                   system_status = 'locked', 
+                   resignation_date = '$effective_date'
+                   WHERE account_id = $aid";
+            if (!mysqli_query($this->conn, $u2)) throw new \Exception("Lỗi cập nhật trạng thái nhân viên.");
+
+            mysqli_commit($this->conn);
+            return ['success' => true, 'message' => 'Đã duyệt nghỉ việc và khóa tài khoản thành công'];
+
+        } catch (\Exception $e) {
+            mysqli_rollback($this->conn);
+            return ['success' => false, 'error' => $e->getMessage()];
         }
-        return ['success' => false, 'error' => 'Lỗi duyệt yêu cầu'];
     }
 
     /**
