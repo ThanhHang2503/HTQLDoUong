@@ -13,7 +13,6 @@ $positions = $pos_result ? mysqli_fetch_all($pos_result, MYSQLI_ASSOC) : [];
 
 // Lấy danh sách nhân viên để đổi chức vụ
 // Điều kiện: đang làm việc (active) + không phải admin (role_id != 1)
-// Không lọc theo position_id để tránh mất nhân viên chưa được gán chức vụ (NULL)
 $emp_sql = "SELECT a.account_id, a.full_name, r.display_name AS role_name,
                    p.position_name AS current_position, p.position_id AS current_position_id,
                    p.base_salary AS current_base_salary
@@ -25,7 +24,9 @@ $emp_sql = "SELECT a.account_id, a.full_name, r.display_name AS role_name,
 $emp_result = mysqli_query($conn, $emp_sql);
 $employees = $emp_result ? mysqli_fetch_all($emp_result, MYSQLI_ASSOC) : [];
 
-// ID đang edit
+$selected_account_id = (int)($_GET['account_id'] ?? 0);
+
+// ID đang edit (Chức vụ)
 $edit_pos_id = (int)($_GET['edit_id'] ?? 0);
 $edit_pos = null;
 if ($edit_pos_id > 0) {
@@ -94,13 +95,13 @@ if ($edit_pos_id > 0) {
                         <i class="fa-solid fa-arrows-rotate me-2"></i>Thay Đổi Chức Vụ Nhân Viên
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="">
+                        <form id="formChangePosition">
                             <div class="mb-2">
-                                <label class="form-label fw-bold">Nhân viên</label>
-                                <select class="form-select" name="account_id" required>
+                                <label class="form-label fw-bold">Nhân viên <span class="text-danger">*</span></label>
+                                <select class="form-select border-warning" name="account_id" id="cp_account_id" required>
                                     <option value="">-- Chọn nhân viên --</option>
                                     <?php foreach ($employees as $emp): ?>
-                                    <option value="<?= $emp['account_id'] ?>">
+                                    <option value="<?= $emp['account_id'] ?>" <?= $selected_account_id === (int)$emp['account_id'] ? 'selected' : '' ?>>
                                         <?= htmlspecialchars($emp['full_name']) ?>
                                         (<?= htmlspecialchars($emp['current_position'] ?? 'Chưa có') ?>)
                                     </option>
@@ -108,8 +109,8 @@ if ($edit_pos_id > 0) {
                                 </select>
                             </div>
                             <div class="mb-2">
-                                <label class="form-label fw-bold">Chức vụ mới</label>
-                                <select class="form-select" name="new_position_id" required>
+                                <label class="form-label fw-bold">Chức vụ mới <span class="text-danger">*</span></label>
+                                <select class="form-select border-warning" name="new_position_id" id="cp_position_id" required>
                                     <option value="">-- Chọn chức vụ --</option>
                                     <?php foreach ($positions as $pos): if (!$pos['is_active']) continue; ?>
                                     <option value="<?= $pos['position_id'] ?>">
@@ -120,15 +121,17 @@ if ($edit_pos_id > 0) {
                                 </select>
                             </div>
                             <div class="mb-2">
-                                <label class="form-label fw-bold">Ngày có hiệu lực</label>
-                                <input type="date" class="form-control" name="change_date" value="<?= date('Y-m-d') ?>" required>
+                                <label class="form-label fw-bold">Tháng có hiệu lực <span class="text-danger">*</span></label>
+                                <input type="month" class="form-control" name="change_month" id="cp_start_date" 
+                                       min="<?= date('Y-m', strtotime('first day of next month')) ?>" 
+                                       value="<?= date('Y-m', strtotime('first day of next month')) ?>" required>
+                                <div class="form-text small">Chỉ thặng chức từ đầu tháng (Ngày 01).</div>
                             </div>
                             <div class="mb-2">
                                 <label class="form-label fw-bold">Lý do thay đổi</label>
-                                <input type="text" class="form-control" name="change_reason" placeholder="VD: Thăng chức, luân chuyển...">
+                                <textarea class="form-control" name="change_reason" id="cp_reason" rows="2" placeholder="Ví dụ: Thăng chức, Điều chuyển..."></textarea>
                             </div>
-                            <button type="submit" name="change_employee_position" class="btn btn-warning w-100 fw-bold"
-                                    onclick="return confirm('Xác nhận thay đổi chức vụ?')">
+                            <button type="submit" class="btn btn-warning w-100 fw-bold mt-2" id="btnSubmitCP">
                                 <i class="fa-solid fa-arrows-rotate me-1"></i>Xác nhận thay đổi
                             </button>
                         </form>
@@ -219,51 +222,150 @@ if ($edit_pos_id > 0) {
 <!-- Modal xem lịch sử chức vụ -->
 <div class="modal fade" id="historyModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="historyModalTitle">Lịch sử chức vụ</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title fw-bold" id="historyModalTitle"><i class="fa-solid fa-clock-rotate-left me-2"></i>Lịch sử chức vụ</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="historyModalBody">
-                <div class="text-center"><div class="spinner-border text-primary"></div></div>
+            <div class="modal-body p-0" id="historyModalBody">
+                <div class="text-center p-5"><div class="spinner-border text-primary"></div></div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Modal Thông báo kết quả (Single Source of Truth Modal) -->
+<div class="modal fade" id="modalResult" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header" id="resultHeader">
+                <h5 class="modal-title fw-bold" id="resultTitle">Thông báo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="fs-1 mb-3" id="resultIcon"></div>
+                <h5 id="resultMsg" class="fw-bold mb-2"></h5>
+                <p id="resultDetails" class="text-muted small mb-0"></p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center pt-0">
+                <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Đã hiểu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-let historyModalObj = null;
+var modalResultInstance = null;
+var historyModalObj = null;
 
 function viewHistory(accId, name) {
     const modalEl = document.getElementById('historyModal');
-    document.getElementById('historyModalTitle').textContent = 'Lịch sử chức vụ: ' + name;
-    document.getElementById('historyModalBody').innerHTML = '<div class="text-center"><div class="spinner-border text-primary"></div></div>';
+    document.getElementById('historyModalTitle').innerHTML = '<i class="fa-solid fa-clock-rotate-left me-2"></i>Lịch sử chức vụ: ' + name;
+    document.getElementById('historyModalBody').innerHTML = '<div class="text-center p-5"><div class="spinner-border text-primary"></div></div>';
     
-    if (!historyModalObj) {
+    if (!historyModalObj && typeof bootstrap !== 'undefined') {
         historyModalObj = new bootstrap.Modal(modalEl);
     }
-    historyModalObj.show();
+    if (historyModalObj) historyModalObj.show();
 
     fetch('user_page.php?chucvu_history_api=1&account_id=' + accId)
         .then(r => r.json())
         .then(data => {
-            let html = '<table class="table table-sm table-striped"><thead><tr><th>Chức vụ</th><th>Từ ngày</th><th>Đến ngày</th></tr></thead><tbody>';
+            let html = '<div class="table-responsive"><table class="table table-striped table-hover mb-0"><thead><tr class="table-light"><th>Chức vụ</th><th>Từ ngày</th><th>Đến ngày</th></tr></thead><tbody>';
             if (data && data.length > 0) {
                 data.forEach(h => {
-                    html += `<tr><td>${h.position_name}</td><td>${h.start_date}</td><td>${h.end_date||'<span class="badge bg-success">Hiện tại</span>'}</td></tr>`;
+                    const end = h.end_date ? h.end_date : '<span class="badge bg-success">Hiện tại</span>';
+                    html += `<tr><td class="fw-bold text-primary">${h.position_name}</td><td>${h.start_date}</td><td>${end}</td></tr>`;
                 });
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
             } else {
-                html = '<p class="text-muted text-center my-3">Chưa có lịch sử biến động chức vụ.</p>';
+                html = '<p class="text-muted text-center my-4">Chưa có lịch sử biến động chức vụ.</p>';
             }
             document.getElementById('historyModalBody').innerHTML = html;
         })
         .catch(err => {
-            document.getElementById('historyModalBody').innerHTML = '<p class="text-danger">Lỗi tải dữ liệu lịch sử.</p>';
+            document.getElementById('historyModalBody').innerHTML = '<p class="text-danger p-3 text-center">Lỗi tải dữ liệu lịch sử.</p>';
         });
+}
+
+// Logic AJAX cho việc đổi chức vụ (Centralized API)
+document.getElementById('formChangePosition').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSubmitCP');
+    const aid = document.getElementById('cp_account_id').value;
+    
+    if (!aid) {
+        alert('Vui lòng chọn nhân viên');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+
+    const monthVal = document.getElementById('cp_start_date').value;
+    if (!monthVal) {
+        alert('Vui lòng chọn tháng có hiệu lực');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-arrows-rotate me-1"></i>Xác nhận thay đổi';
+        return;
+    }
+
+    const payload = {
+        position_id: document.getElementById('cp_position_id').value,
+        start_date: monthVal + "-01", // Luôn là ngày 01 của tháng đã chọn
+        reason: document.getElementById('cp_reason').value
+    };
+
+    try {
+        const res = await fetch(`api/hr/index.php/employees/${aid}/position`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        
+        if (result.success) {
+            showResult(true, "Thành Công", result.message);
+            // Reload page sau khi đóng modal để cập nhật bảng (hoặc cập nhật inline)
+            document.getElementById('modalResult').addEventListener('hidden.bs.modal', function() {
+                window.location.href = 'user_page.php?chucvu';
+            }, { once: true });
+        } else {
+            showResult(false, "Không Thể Cập Nhật", result.error || result.message);
+        }
+    } catch (err) {
+        showResult(false, "Lỗi Kết Nối", "Không thể kết nối tới máy chủ.");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-arrows-rotate me-1"></i>Xác nhận thay đổi';
+    }
+});
+
+function showResult(success, title, msg) {
+    const header = document.getElementById('resultHeader');
+    const titleEl = document.getElementById('resultTitle');
+    const msgEl = document.getElementById('resultMsg');
+    const iconEl = document.getElementById('resultIcon');
+
+    if (success) {
+        header.className = "modal-header text-bg-success border-0";
+        titleEl.innerText = title;
+        msgEl.innerText = msg;
+        iconEl.innerHTML = '<i class="fa-solid fa-circle-check text-success"></i>';
+    } else {
+        header.className = "modal-header text-bg-danger border-0";
+        titleEl.innerText = title;
+        msgEl.innerText = msg;
+        iconEl.innerHTML = '<i class="fa-solid fa-circle-xmark text-danger"></i>';
+    }
+
+    if (!modalResultInstance && typeof bootstrap !== 'undefined') {
+        modalResultInstance = new bootstrap.Modal(document.getElementById('modalResult'));
+    }
+    if (modalResultInstance) modalResultInstance.show();
 }
 </script>
 </div>

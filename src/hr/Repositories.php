@@ -87,9 +87,9 @@ class PositionHistoryRepository {
         $this->conn = $conn;
     }
 
-    public function getByAccountId(int $account_id): array {
+    public function getByAccountId(int $account_id, string $order = 'DESC'): array {
         $query = "SELECT * FROM employee_positions_history WHERE account_id = $account_id 
-                  ORDER BY start_date DESC";
+                  ORDER BY start_date $order";
         $result = mysqli_query($this->conn, $query);
         $histories = [];
         while ($row = mysqli_fetch_assoc($result)) {
@@ -100,7 +100,40 @@ class PositionHistoryRepository {
 
     public function getCurrentPosition(int $account_id): ?PositionHistory {
         $query = "SELECT * FROM employee_positions_history WHERE account_id = $account_id 
-                  AND end_date IS NULL ORDER BY start_date DESC LIMIT 1";
+                  AND (end_date IS NULL OR end_date >= CURRENT_DATE()) 
+                  ORDER BY start_date DESC LIMIT 1";
+        $result = mysqli_query($this->conn, $query);
+        if ($row = mysqli_fetch_assoc($result)) {
+            return new PositionHistory($row);
+        }
+        return null;
+    }
+
+    /**
+     * Lấy bản ghi đang có hiệu lực tại một ngày cụ thể
+     */
+    public function getByDate(int $account_id, string $date): ?PositionHistory {
+        $date = mysqli_real_escape_string($this->conn, $date);
+        $query = "SELECT * FROM employee_positions_history 
+                  WHERE account_id = $account_id 
+                  AND start_date <= '$date' 
+                  AND (end_date IS NULL OR end_date >= '$date')
+                  LIMIT 1";
+        $result = mysqli_query($this->conn, $query);
+        if ($row = mysqli_fetch_assoc($result)) {
+            return new PositionHistory($row);
+        }
+        return null;
+    }
+
+    /**
+     * Lấy bản ghi bắt đầu ngay sau hoặc tại ngày cụ thể
+     */
+    public function getFollowing(int $account_id, string $date): ?PositionHistory {
+        $date = mysqli_real_escape_string($this->conn, $date);
+        $query = "SELECT * FROM employee_positions_history 
+                  WHERE account_id = $account_id AND start_date > '$date'
+                  ORDER BY start_date ASC LIMIT 1";
         $result = mysqli_query($this->conn, $query);
         if ($row = mysqli_fetch_assoc($result)) {
             return new PositionHistory($row);
@@ -111,11 +144,12 @@ class PositionHistoryRepository {
     public function create(PositionHistory $history): int {
         $aid = (int)$history->account_id;
         $pid = (int)$history->position_id;
-        $start = $history->start_date;
+        $start = mysqli_real_escape_string($this->conn, $history->start_date);
+        $end = $history->end_date ? "'" . mysqli_real_escape_string($this->conn, $history->end_date) . "'" : "NULL";
         $reason = mysqli_real_escape_string($this->conn, $history->reason ?? '');
         
-        $query = "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason) 
-                  VALUES ($aid, $pid, '$start', '$reason')";
+        $query = "INSERT INTO employee_positions_history (account_id, position_id, start_date, end_date, reason) 
+                  VALUES ($aid, $pid, '$start', $end, '$reason')";
         
         if (mysqli_query($this->conn, $query)) {
             return (int)mysqli_insert_id($this->conn);
@@ -123,7 +157,26 @@ class PositionHistoryRepository {
         return 0;
     }
 
+    public function update(PositionHistory $history): bool {
+        $hid = (int)$history->history_id;
+        $pid = (int)$history->position_id;
+        $start = mysqli_real_escape_string($this->conn, $history->start_date);
+        $end = $history->end_date ? "'" . mysqli_real_escape_string($this->conn, $history->end_date) . "'" : "NULL";
+        $reason = mysqli_real_escape_string($this->conn, $history->reason ?? '');
+        
+        $query = "UPDATE employee_positions_history SET 
+                  position_id = $pid, start_date = '$start', end_date = $end, reason = '$reason' 
+                  WHERE history_id = $hid";
+        return (bool)mysqli_query($this->conn, $query);
+    }
+
+    public function delete(int $history_id): bool {
+        $query = "DELETE FROM employee_positions_history WHERE history_id = $history_id";
+        return (bool)mysqli_query($this->conn, $query);
+    }
+
     public function endCurrentPosition(int $account_id, string $end_date): bool {
+        $end_date = mysqli_real_escape_string($this->conn, $end_date);
         $query = "UPDATE employee_positions_history SET end_date = '$end_date' 
                   WHERE account_id = $account_id AND end_date IS NULL";
         return (bool)mysqli_query($this->conn, $query);

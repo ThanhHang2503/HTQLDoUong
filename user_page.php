@@ -3,6 +3,11 @@ session_start();
 @include 'config.php';
 require_once __DIR__ . '/src/models/functions.php';
 require_once __DIR__ . '/src/models/authorization.php';
+require_once __DIR__ . '/src/hr/Models.php';
+require_once __DIR__ . '/src/hr/Repositories.php';
+require_once __DIR__ . '/src/hr/Services.php';
+
+use HR\Services\EmployeeService;
 
 requireLogin();
 
@@ -639,16 +644,20 @@ if (isset($_POST['change_employee_position'])) {
     $new_pos = (int)($_POST['new_position_id'] ?? 0);
     $reason  = trim(mysqli_real_escape_string($conn, $_POST['change_reason'] ?? ''));
     $date    = trim($_POST['change_date'] ?? date('Y-m-d'));
-    // Chặn gán chức vụ Quản trị viên (position_id=1) từ giao diện HR
+
     if ($acc_id > 0 && $new_pos > 0 && $new_pos != 1) {
-        mysqli_query($conn, "UPDATE employee_positions_history SET end_date='$date'
-                              WHERE account_id=$acc_id AND end_date IS NULL");
-        mysqli_query($conn, "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason, created_by)
-                              VALUES ($acc_id, $new_pos, '$date', '$reason', " . currentUserId() . ")");
-        mysqli_query($conn, "UPDATE accounts SET position_id=$new_pos, role_id=$new_pos WHERE account_id=$acc_id");
-        setNotify('success', 'Đã đổi chức vụ nhân viên thành công.');
+        $employeeService = new EmployeeService($conn);
+        $result = $employeeService->changePosition($acc_id, $new_pos, $date, $reason);
+
+        if ($result['success']) {
+            setNotify('success', $result['message'] ?? 'Đã đổi chức vụ nhân viên thành công.');
+        } else {
+            setNotify('error', $result['error'] ?? 'Lỗi không xác định khi đổi chức vụ.');
+        }
     } elseif ($new_pos == 1) {
         setNotify('error', 'Không thể gán chức vụ Quản trị viên từ giao diện nhân sự.');
+    } else {
+        setNotify('error', 'Dữ liệu không hợp lệ.');
     }
     header('Location: user_page.php?chucvu'); exit;
 }

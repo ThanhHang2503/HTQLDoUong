@@ -25,10 +25,10 @@ header('Content-Type: application/json; charset=utf-8');
 
 // Load configuration
 require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/Models.php';
-require_once __DIR__ . '/Repositories.php';
-require_once __DIR__ . '/Services.php';
-require_once __DIR__ . '/Middleware.php';
+require_once __DIR__ . '/../../src/hr/Models.php';
+require_once __DIR__ . '/../../src/hr/Repositories.php';
+require_once __DIR__ . '/../../src/hr/Services.php';
+require_once __DIR__ . '/../../src/hr/Middleware.php';
 
 use HR\Middleware\HRAuthMiddleware;
 use HR\Services\{EmployeeService, SalaryService, LeaveService, ResignationService, HRStatisticsService};
@@ -40,13 +40,26 @@ error_reporting(E_ALL);
 // Check authentication
 HRAuthMiddleware::requireHRAccess();
 
-// Get request method and path
+// Get request method and action path
 $method = $_SERVER['REQUEST_METHOD'];
-$path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$path_parts = array_filter(explode('/', $path));
+$pathInfo = $_SERVER['PATH_INFO'] ?? '';
 
-// Remove /api/hr from path
-$endpoint = implode('/', array_slice($path_parts, -2));
+if (!$pathInfo) {
+    // Fallback if PATH_INFO is not populated
+    $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    $apiBase = '/api/hr/index.php';
+    if (strpos($requestUri, $apiBase) !== false) {
+        $pathInfo = substr($requestUri, strpos($requestUri, $apiBase) + strlen($apiBase));
+    } else {
+        $apiBaseShort = '/api/hr';
+        if (strpos($requestUri, $apiBaseShort) !== false) {
+            $pathInfo = substr($requestUri, strpos($requestUri, $apiBaseShort) + strlen($apiBaseShort));
+        }
+    }
+}
+
+// Normalize endpoint (e.g., "employees/13/position")
+$endpoint = trim($pathInfo, '/');
 
 // Initialize services
 $employeeService = new EmployeeService($conn);
@@ -104,13 +117,22 @@ try {
             $result = $employeeService->deleteEmployee((int)$m[1]);
             exit(json_encode($result));
         
-        // POST /api/hr/employees/{id}/position - Đổi chức vụ
+        // POST /api/hr/employees/{id}/position - Đổi chức vụ (Timeline)
         case $method === 'POST' && preg_match('/^employees\/(\d+)\/position$/', $endpoint, $m):
             if (!$input['position_id']) {
                 http_response_code(400);
                 exit(json_encode(['success' => false, 'message' => 'Vui lòng cung cấp position_id']));
             }
-            $result = $employeeService->changePosition((int)$m[1], (int)$input['position_id'], $input['reason'] ?? '');
+            $result = $employeeService->changePosition(
+                (int)$m[1], 
+                (int)$input['position_id'], 
+                $input['start_date'] ?? null, 
+                $input['reason'] ?? ''
+            );
+            
+            if (!$result['success']) {
+                http_response_code(400);
+            }
             exit(json_encode($result));
         
         // GET /api/hr/employees/{id}/positions - Lịch sử chức vụ

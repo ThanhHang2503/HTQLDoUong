@@ -5,6 +5,12 @@ require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../src/models/functions.php';
 require_once __DIR__ . '/../../src/models/authorization.php';
 
+require_once __DIR__ . '/../../src/hr/Models.php';
+require_once __DIR__ . '/../../src/hr/Repositories.php';
+require_once __DIR__ . '/../../src/hr/Services.php';
+
+use HR\Services\EmployeeService;
+
 // Bảo mật API, chỉ Admin mới được dùng
 if (!isLoggedIn() || !can(AppPermission::MANAGE_ACCOUNTS)) {
     http_response_code(403);
@@ -15,6 +21,7 @@ if (!isLoggedIn() || !can(AppPermission::MANAGE_ACCOUNTS)) {
 header('Content-Type: application/json; charset=utf-8');
 global $conn;
 
+$employeeService = new EmployeeService($conn);
 $method = $_SERVER['REQUEST_METHOD'];
 
 try {
@@ -89,12 +96,7 @@ try {
         
         if (mysqli_query($conn, $sql)) {
             $new_id = mysqli_insert_id($conn);
-            // Tự động tạo lịch sử chức vụ nếu có chọn chức vụ
-            if ($position_id > 0) {
-                $start_history = $hire_date;
-                mysqli_query($conn, "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason, created_by)
-                                      VALUES ($new_id, $position_id, $start_history, 'Khởi tạo nhân sự mới', " . currentUserId() . ")");
-            }
+            // Position initialization removed here to enforce centralization in chucvu module.
             echo json_encode(['success' => true, 'message' => 'Thêm tài khoản thành công', 'id' => $new_id]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Đã xảy ra lỗi khi thêm tài khoản', 'error' => mysqli_error($conn)]);
@@ -161,19 +163,8 @@ try {
                     $role_sql $password_sql 
                 WHERE account_id = $account_id";
         
-        // Kiểm tra xem position có thay đổi không để cập nhật history
-        $oldRes = mysqli_query($conn, "SELECT position_id FROM accounts WHERE account_id = $account_id");
-        $oldRow = mysqli_fetch_assoc($oldRes);
-        $old_pos = (int)($oldRow['position_id'] ?? 0);
-
         if (mysqli_query($conn, $sql)) {
-            if ($position_id > 0 && $position_id !== $old_pos) {
-                // Đóng history cũ nếu có
-                mysqli_query($conn, "UPDATE employee_positions_history SET end_date = CURDATE() WHERE account_id = $account_id AND end_date IS NULL");
-                // Mở history mới
-                mysqli_query($conn, "INSERT INTO employee_positions_history (account_id, position_id, start_date, reason, created_by)
-                                      VALUES ($account_id, $position_id, CURDATE(), 'Cập nhật từ hồ sơ nhân sự', " . currentUserId() . ")");
-            }
+            // Position update logic removed here to enforce centralization in chucvu module.
             echo json_encode(['success' => true, 'message' => 'Cập nhật tài khoản thành công']);
         } else {
             echo json_encode(['success' => false, 'message' => 'Lỗi cập nhật', 'error' => mysqli_error($conn)]);

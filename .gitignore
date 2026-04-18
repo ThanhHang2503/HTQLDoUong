@@ -1,0 +1,53 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Config & Sensitive Info
+config.php
+.env
+.env.*
+*.local.php
+
+# Logs & Cache
+*.log
+/cache/
+/tmp/
+error_log
+
+# User Uploads
+# Ignore product images (IDs), but keep core assets if needed.
+# Typically, for simplicity:
+/img/[0-9]*.jpg
+/img/[0-9]*.png
+/img/[0-9]*.jpeg
+
+# If you want to ignore ALL images except specific assets:
+# /img/*
+# !/img/logo.jpg
+# !/img/background.jpg
+# ...
+
+# Build / Temporary / Scratch
+/scratch/
+*.bak
+dump.sql
+*.sql
+.gemini/
+
+# PHP specific
+composer.phar
+.php-cs-fixer.cache
+.phpunit.result.cache

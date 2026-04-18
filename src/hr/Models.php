@@ -57,9 +57,9 @@ class PositionHistory {
     public string $created_at;
 
     public function __construct(array $data = []) {
-        $this->history_id = $data['history_id'] ?? 0;
-        $this->account_id = $data['account_id'] ?? 0;
-        $this->position_id = $data['position_id'] ?? 0;
+        $this->history_id = (int)($data['history_id'] ?? 0);
+        $this->account_id = (int)($data['account_id'] ?? 0);
+        $this->position_id = (int)($data['position_id'] ?? 0);
         $this->start_date = $data['start_date'] ?? date('Y-m-d');
         $this->end_date = $data['end_date'] ?? null;
         $this->reason = $data['reason'] ?? null;

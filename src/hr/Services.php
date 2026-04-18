@@ -125,34 +125,165 @@ class EmployeeService {
     }
 
     /**
-     * Đổi chức vụ nhân viên (với lưu lịch sử)
+     * Đổi chức vụ nhân viên theo mô hình Timeline
      */
-    public function changePosition(int $account_id, int $new_position_id, string $reason = ''): array {
+    public function changePosition(int $account_id, int $new_position_id, string $start_date = null, string $reason = ''): array {
         $aid = (int)$account_id;
         $new_pos = (int)$new_position_id;
         
-        // End current position
-        $this->posHistRepo->endCurrentPosition($aid, date('Y-m-d'));
+        // 1. Ràng buộc: Phải là ngày 01 của tháng
+        if (!$start_date || substr($start_date, -2) !== '01') {
+            return ['success' => false, 'error' => "Chỉ được thăng chức từ ngày đầu tiên của tháng (Ngày 01)."];
+        }
+
+        // 2. Ràng buộc: Phải là tháng trong tương lai (lớn hơn mốc đầu tháng hiện tại)
+        $current_month_start = date('Y-m-01');
+        if ($start_date <= $current_month_start) {
+            return ['success' => false, 'error' => "Chỉ cho phép thăng chức vào các tháng trong tương lai (Tháng tiếp theo trở đi)."];
+        }
+
+        mysqli_begin_transaction($this->conn);
         
-        // Create new position history
-        $hist = new PositionHistory([
-            'account_id' => $aid,
-            'position_id' => $new_pos,
-            'start_date' => date('Y-m-d'),
-            'reason' => $reason,
-        ]);
+        try {
+            // Lấy toàn bộ lịch sử sắp xếp tăng dần
+            $all_history = $this->posHistRepo->getByAccountId($aid, 'ASC');
+            
+            // 3. Kiểm tra trùng lặp liên tiếp (không được thăng chức vào chức vụ đang có)
+            // Lấy chức vụ đang hiệu lực ngay trước ngày bắt đầu mới
+            $prev_record = null;
+            foreach ($all_history as $h) {
+                if ($h->start_date < $start_date) {
+                    $prev_record = $h;
+                }
+            }
+            if ($prev_record && (int)$prev_record->position_id === $new_pos) {
+                throw new \Exception("Chức vụ mới không được trùng với chức vụ ở mốc thời gian liền trước.");
+            }
+
+            // 4. Xử lý Timeline theo quy tắc đơn giản
+            // Nếu đã có bản ghi bắt đầu đúng ngày này -> Cập nhật (Sửa lịch hẹn)
+            $same_day = null;
+            foreach ($all_history as $h) {
+                if ($h->start_date === $start_date) {
+                    $same_day = $h;
+                    break;
+                }
+            }
+
+            if ($same_day) {
+                $same_day->position_id = $new_pos;
+                $same_day->reason = $reason;
+                $this->posHistRepo->update($same_day);
+            } else {
+                // Nếu chưa có -> Tạo mốc mới
+                
+                // Tìm bản ghi kế sau (nếu có) để chốt ngày kết thúc cho bản ghi mới
+                $next_record = null;
+                foreach ($all_history as $h) {
+                    if ($h->start_date > $start_date) {
+                        $next_record = $h;
+                        break; 
+                    }
+                }
+
+                // A. Chốt ngày kết thúc cho bản ghi liền trước
+                if ($prev_record) {
+                    $prev_record->end_date = date('Y-m-d', strtotime($start_date . ' -1 day'));
+                    $this->posHistRepo->update($prev_record);
+                }
+
+                // B. Tạo bản ghi mới
+                $new_end = $next_record ? date('Y-m-d', strtotime($next_record->start_date . ' -1 day')) : null;
+                $new_hist = new PositionHistory([
+                    'account_id' => $aid,
+                    'position_id' => $new_pos,
+                    'start_date' => $start_date,
+                    'end_date' => $new_end,
+                    'reason' => $reason
+                ]);
+                $this->posHistRepo->create($new_hist);
+            }
+
+            // 5. Đồng bộ vào bảng accounts
+            $this->syncCurrentPosition($aid);
+            
+            mysqli_commit($this->conn);
+            return [
+                'success' => true, 
+                'message' => "Đã lên lịch thăng chức thành công vào ngày $start_date"
+            ];
+
+        } catch (\Exception $e) {
+            mysqli_rollback($this->conn);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Công cụ dọn dẹp và gộp timeline (Public)
+     */
+    public function cleanupTimeline(int $account_id): void {
+        mysqli_begin_transaction($this->conn);
+        $this->mergePositionTimeline($account_id);
+        $this->syncCurrentPosition($account_id);
+        mysqli_commit($this->conn);
+    }
+
+    /**
+     * Tự động gộp các bản ghi trùng lặp hoặc nối tiếp cùng chức vụ
+     */
+    private function mergePositionTimeline(int $account_id): void {
+        $history = $this->posHistRepo->getByAccountId($account_id, 'ASC');
+        if (count($history) < 2) return;
         
-        $hist_id = $this->posHistRepo->create($hist);
+        $changed = false;
+        for ($i = 0; $i < count($history) - 1; $i++) {
+            $curr = $history[$i];
+            $next = $history[$i+1];
+            
+            // 1. Trùng mốc thời gian -> Giữ lại cái sau, xóa cái trước
+            if ($curr->start_date === $next->start_date) {
+                $this->posHistRepo->delete($curr->history_id);
+                $changed = true;
+                break;
+            }
+            
+            // 2. Cùng chức vụ và nối tiếp nhau -> Gộp vào cái trước
+            if ($curr->position_id === $next->position_id) {
+                $curr->end_date = $next->end_date;
+                $this->posHistRepo->update($curr);
+                $this->posHistRepo->delete($next->history_id);
+                $changed = true;
+                break;
+            }
+            
+            // 3. Đảm bảo tính liên tục của Timeline
+            $expected_end = date('Y-m-d', strtotime($next->start_date . ' -1 day'));
+            if ($curr->end_date !== $expected_end) {
+                // Chỉ sửa nếu ngày kết thúc bị sai lệch so với mốc bắt đầu kế tiếp (Xử lý Overlap)
+                $curr->end_date = $expected_end;
+                $this->posHistRepo->update($curr);
+                $changed = true;
+                break;
+            }
+        }
         
-        // Update accounts table
-        $query = "UPDATE accounts SET position_id = $new_pos WHERE account_id = $aid";
-        mysqli_query($this->conn, $query);
-        
-        return [
-            'success' => true,
-            'history_id' => $hist_id,
-            'message' => 'Cập nhật chức vụ thành công'
-        ];
+        if ($changed) {
+            $this->mergePositionTimeline($account_id);
+        }
+    }
+
+    /**
+     * Đồng bộ chức vụ hiện tại từ Timeline vào bảng accounts
+     */
+    public function syncCurrentPosition(int $account_id): void {
+        $aid = (int)$account_id;
+        $current = $this->posHistRepo->getByDate($aid, date('Y-m-d'));
+        if ($current) {
+            $pid = (int)$current->position_id;
+            $query = "UPDATE accounts SET position_id = $pid WHERE account_id = $aid";
+            mysqli_query($this->conn, $query);
+        }
     }
 
     /**

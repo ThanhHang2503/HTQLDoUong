@@ -168,6 +168,8 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
     </div>
 </div>
 
+<!-- Modal Thông báo kết quả (Modal Thông báo) removed - now handled in chucvu.php -->
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 let accountsData = [];
@@ -175,8 +177,8 @@ let positionsData = [];
 const currentUserId = <?= currentUserId() ?>;
 const currentRole = '<?= currentRole() ?>';
 
-const modalAccount = new bootstrap.Modal(document.getElementById('modalAccount'));
-const modalToggle = new bootstrap.Modal(document.getElementById('modalToggleStatus'));
+var modalAccount = null;
+var modalToggle = null;
 const apiUrl = 'api/admin/accounts.php';
 
 // Format status badge
@@ -247,6 +249,12 @@ function renderTable() {
             const hrIcon = acc.hr_status === 'active' ? 'fa-toggle-on text-success' : 'fa-toggle-off text-muted';
             hrToggleBtn = `<button class="btn btn-sm btn-light border px-2" title="Đổi trạng thái HR" onclick="promptToggle(${acc.account_id}, 'hr', '${acc.hr_status}', '${acc.full_name}')"><i class="fa-solid ${hrIcon} fs-5 align-middle"></i></button>`;
         }
+        
+        // Nút Đổi chức vụ (Điều hướng sang Module trung tâm)
+        let posChangeBtn = '';
+        if (currentRole === 'admin' || currentRole === 'manager') {
+             posChangeBtn = `<a href="user_page.php?chucvu&account_id=${acc.account_id}" class="btn btn-sm btn-outline-warning" title="Chuyển sang module Thay đổi chức vụ"><i class="fa-solid fa-user-tag"></i></a>`;
+        }
 
         if (currentRole === 'admin') {
             if (parseInt(acc.account_id) === currentUserId) {
@@ -274,7 +282,7 @@ function renderTable() {
             <td>${renderSystemStatus(acc.system_status)}</td>
             <td>
                 <div class="d-flex align-items-center justify-content-center gap-1">
-                    ${viewBtn} ${editBtn} ${hrToggleBtn} ${sysToggleBtn}
+                    ${viewBtn} ${editBtn} ${posChangeBtn} ${hrToggleBtn} ${sysToggleBtn}
                 </div>
             </td>
         `;
@@ -304,11 +312,17 @@ function setModalReadOnly(isReadOnly) {
     document.getElementById('btnSaveAccount').style.display = isReadOnly ? 'none' : 'block';
 }
 
-function openAddModal() {
+function resetForm() {
     document.getElementById('formAccount').reset();
+    document.getElementById('ac_account_id').value = '';
+    document.getElementById('ac_position_id').disabled = false; // Mở lại khi add mới
+    setModalReadOnly(false);
+}
+
+function openAddModal() {
+    resetForm();
     document.getElementById('ac_account_id').value = 0;
     
-    setModalReadOnly(false);
     document.getElementById('modalAccountTitle').innerText = 'Thêm Tài Khoản Mới';
 
     // Hiện cả 2 phần khi thêm mới
@@ -322,7 +336,7 @@ function openAddModal() {
     document.getElementById('ac_email').disabled = false;
     document.getElementById('ac_position_id').disabled = false;
 
-    modalAccount.show();
+    if (modalAccount) modalAccount.show();
 }
 
 function openEditModal(id) {
@@ -338,9 +352,12 @@ function openEditModal(id) {
     document.getElementById('ac_gender').value = acc.gender || 'nam';
     document.getElementById('ac_hire_date').value = acc.hire_date || '';
     document.getElementById('ac_address').value = acc.address || '';
-    document.getElementById('ac_position_id').value = acc.position_id || '';
     
-    document.getElementById('modalAccountTitle').innerText = (currentRole === 'admin') ? 'Quản lý phân quyền: ' + acc.full_name : 'Cập Nhật Thông Tin: ' + acc.full_name;
+    const posSel = document.getElementById('ac_position_id');
+    posSel.value = acc.position_id || '';
+    posSel.disabled = true; // Chặn sửa position tại đây, phải dùng module chucvu
+    
+    document.getElementById('modalAccountTitle').innerText = 'Sửa Thông Tin Hồ Sơ: ' + acc.full_name;
     
     // Mật khẩu không bắt buộc khi sửa
     document.getElementById('ac_password').required = false;
@@ -358,9 +375,8 @@ function openEditModal(id) {
 
     // Email không cho đổi khi sửa
     document.getElementById('ac_email').disabled = true;
-    document.getElementById('ac_position_id').disabled = false;
 
-    modalAccount.show();
+    if (modalAccount) modalAccount.show();
 }
 
 function viewAccountDetails(id) {
@@ -387,7 +403,7 @@ function viewAccountDetails(id) {
     document.getElementById('ac_password').parentElement.style.display = 'none'; // Ẩn hẳn ô password khi xem
 
     setModalReadOnly(true);
-    modalAccount.show();
+    if (modalAccount) modalAccount.show();
 
     // Fetch history
     fetchHistory(id);
@@ -469,7 +485,7 @@ async function saveAccount(e) {
         const result = await res.json();
         
         if (result.success) {
-            modalAccount.hide();
+            if (modalAccount) modalAccount.hide();
             await loadAccounts(); // Tải lại bảng
         } else {
             alert('Lỗi: ' + result.message);
@@ -510,7 +526,7 @@ function promptToggle(id, target, currentStatus, name, role_name) {
 
     document.getElementById('toggleStatusMsg').innerHTML = msg;
     document.getElementById('toggle_new_status').value = nextStatus;
-    modalToggle.show();
+    if (modalToggle) modalToggle.show();
 }
 
 async function executeToggle() {
@@ -527,7 +543,7 @@ async function executeToggle() {
         const result = await res.json();
         
         if (result.success) {
-            modalToggle.hide();
+            if (modalToggle) modalToggle.hide();
             await loadAccounts();
         } else {
             alert('Lỗi: ' + result.message);
@@ -539,6 +555,10 @@ async function executeToggle() {
 
 // Khởi tạo
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof bootstrap !== 'undefined') {
+        modalAccount = new bootstrap.Modal(document.getElementById('modalAccount'));
+        modalToggle = new bootstrap.Modal(document.getElementById('modalToggleStatus'));
+    }
     loadAccounts();
 });
 </script>
