@@ -60,19 +60,19 @@ if ($editSupplierId > 0) {
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Người liên hệ</label>
-                            <input class="form-control" type="text" name="contact_name">
+                            <input class="form-control" type="text" name="contact_name" required>
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Số điện thoại</label>
-                            <input class="form-control" type="text" name="phone_number">
+                            <input class="form-control" type="text" name="phone_number" inputmode="numeric" pattern="[0-9]{10,11}" minlength="10" maxlength="11" required title="Số điện thoại chỉ gồm 10 hoặc 11 chữ số">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Email</label>
-                            <input class="form-control" type="email" name="email">
+                            <input class="form-control" type="email" name="email" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Địa chỉ</label>
-                            <textarea class="form-control" name="address" rows="2"></textarea>
+                            <textarea class="form-control" name="address" rows="2" required></textarea>
                         </div>
 
                         <button class="btn btn-success" type="submit">Thêm nhà cung cấp</button>

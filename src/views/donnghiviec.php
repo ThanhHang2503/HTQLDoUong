@@ -13,9 +13,11 @@ if (isset($_POST['submit_resignation'])) {
     $effective_date = trim($_POST['effective_date'] ?? '');
     $reason = trim(mysqli_real_escape_string($conn, $_POST['reason'] ?? ''));
     $today = date('Y-m-d');
+    $tomorrow = date('Y-m-d', strtotime('+1 day'));
+    $effective_valid = DateTime::createFromFormat('Y-m-d', $effective_date) && DateTime::createFromFormat('Y-m-d', $effective_date)->format('Y-m-d') === $effective_date;
 
-    if ($effective_date < $today) {
-        $msg_error = 'Ngày nghỉ hiệu lực không được ở quá khứ.';
+    if (!$effective_valid || $effective_date < $tomorrow) {
+        $msg_error = 'Ngày nghỉ việc phải từ ngày mai trở đi';
     } elseif ($reason === '') {
         $msg_error = 'Lý do không được để trống.';
     } else {
@@ -121,8 +123,8 @@ $status_class = ['chờ duyệt'=>'warning','chấp thuận'=>'success','từ ch
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Ngày nghỉ hiệu lực</label>
                                 <input type="date" class="form-control" name="effective_date"
-                                       min="<?= date('Y-m-d') ?>"
-                                       value="<?= date('Y-m-d') ?>" required>
+                                       min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+                                       value="<?= date('Y-m-d', strtotime('+1 day')) ?>" required>
                                 <small class="text-muted">Chọn ngày bắt đầu nghỉ việc</small>
                             </div>
                             <div class="mb-3">

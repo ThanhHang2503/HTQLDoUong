@@ -43,10 +43,10 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
 </div>
 
 <!-- Modal Thêm/Sửa Tài Khoản -->
-<div class="modal fade" id="modalAccount" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalAccount" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="formAccount" onsubmit="saveAccount(event)">
+            <form id="formAccount">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold" id="modalAccountTitle">Thêm Tài Khoản Mới</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -70,7 +70,7 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
                         <div class="row g-2">
                             <div class="col-md-6 mb-2">
                                 <label class="form-label fw-bold">Số điện thoại</label>
-                                <input type="text" class="form-control" id="ac_phone" placeholder="090...">
+                                <input type="text" class="form-control" id="ac_phone" placeholder="090..." inputmode="numeric" pattern="[0-9]{10,}">
                             </div>
                             <div class="col-md-6 mb-2">
                                 <label class="form-label fw-bold">Ngày sinh</label>
@@ -113,7 +113,6 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
                             <input type="password" class="form-control" id="ac_password" placeholder="Nhập mật khẩu">
                             <div class="form-text" id="ac_password_help">Để trống nếu không muốn đổi mật khẩu.</div>
                         </div>
-                        </div>
                     </div>
 
                     <!-- PHẦN LỊCH SỬ CHỨC VỤ (Mới) -->
@@ -147,7 +146,7 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
 </div>
 
 <!-- Modal Xác Nhận Toggle Status -->
-<div class="modal fade" id="modalToggleStatus" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalToggleStatus" tabindex="-1">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header text-bg-warning">
@@ -169,7 +168,7 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
 </div>
 
 <!-- Modal Thông báo kết quả -->
-<div class="modal fade" id="modalResult" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalResult" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header" id="resultHeader">
@@ -269,9 +268,9 @@ function renderTable() {
             hrToggleBtn = `<button class="btn btn-sm btn-light border px-2" title="Đổi trạng thái HR" onclick="promptToggle(${acc.account_id}, 'hr', '${acc.hr_status}', '${acc.full_name}')"><i class="fa-solid ${hrIcon} fs-5 align-middle"></i></button>`;
         }
         
-        // Nút Đổi chức vụ (Điều hướng sang Module trung tâm)
+           // Nút Đổi chức vụ chỉ dành cho Quản lý nhân sự
         let posChangeBtn = '';
-        if (currentRole === 'admin' || currentRole === 'manager') {
+           if (currentRole === 'manager') {
              posChangeBtn = `<a href="user_page.php?chucvu&account_id=${acc.account_id}" class="btn btn-sm btn-outline-warning" title="Chuyển sang module Thay đổi chức vụ"><i class="fa-solid fa-user-tag"></i></a>`;
         }
 
@@ -364,6 +363,7 @@ function openEditModal(id) {
 
     setModalReadOnly(false);
     document.getElementById('formAccount').reset();
+    document.getElementById('ac_account_id').value = acc.account_id;
     document.getElementById('ac_full_name').value = acc.full_name;
     document.getElementById('ac_email').value = acc.email;
     document.getElementById('ac_phone').value = acc.phone || '';
@@ -473,19 +473,48 @@ function formatDate(dateStr) {
     return d.toLocaleDateString('vi-VN');
 }
 
+function isValidPhone(phone) {
+    return /^\d{10,}$/.test(phone);
+}
+
+function isValidEmail(email) {
+    if (/\s/.test(email)) {
+        return false;
+    }
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 async function saveAccount(e) {
     e.preventDefault();
+    
     const btn = document.getElementById('btnSaveAccount');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
 
     const id = parseInt(document.getElementById('ac_account_id').value);
+    const emailInput = document.getElementById('ac_email').value.trim();
+    const phoneInput = document.getElementById('ac_phone').value.trim();
+
+    if (!isValidEmail(emailInput)) {
+        showResult(false, 'Thất bại', 'Email không đúng định dạng');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Lưu thông tin';
+        return;
+    }
+
+    if (phoneInput !== '' && !isValidPhone(phoneInput)) {
+        showResult(false, 'Thất bại', 'Số điện thoại không đúng định dạng');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Lưu thông tin';
+        return;
+    }
+
     const payload = {
         account_id: id,
         full_name: document.getElementById('ac_full_name').value,
-        email: document.getElementById('ac_email').value,
+        email: emailInput,
         password: document.getElementById('ac_password').value,
-        phone: document.getElementById('ac_phone').value,
+        phone: phoneInput,
         birth_date: document.getElementById('ac_birth_date').value,
         gender: document.getElementById('ac_gender').value,
         hire_date: document.getElementById('ac_hire_date').value,
@@ -581,6 +610,16 @@ document.addEventListener('DOMContentLoaded', () => {
         modalToggle = new bootstrap.Modal(document.getElementById('modalToggleStatus'));
         modalResult = new bootstrap.Modal(document.getElementById('modalResult'));
     }
+    
+    // Gán event listener cho form
+    const formAccount = document.getElementById('formAccount');
+    if (formAccount) {
+        formAccount.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveAccount(e);
+        });
+    }
+    
     loadAccounts();
 });
 

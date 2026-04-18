@@ -210,6 +210,11 @@ try {
                 exit(json_encode(['success' => false, 'message' => 'Thiếu tham số']));
             }
             $result = $leaveService->requestLeave(HRAuthMiddleware::getCurrentUserId(), $input);
+            if (!$result['success']) {
+                http_response_code(400);
+                $message = $result['message'] ?? $result['error'] ?? 'Yêu cầu nghỉ phép không hợp lệ';
+                exit(json_encode(['success' => false, 'message' => $message]));
+            }
             exit(json_encode($result));
         
         // GET /api/hr/leave/{id}/history - Lịch sử nghỉ phép
@@ -241,6 +246,11 @@ try {
                 exit(json_encode(['success' => false, 'message' => 'Thiếu tham số']));
             }
             $result = $resignationService->requestResignation(HRAuthMiddleware::getCurrentUserId(), $input);
+            if (!$result['success']) {
+                http_response_code(400);
+                $message = $result['message'] ?? $result['error'] ?? 'Yêu cầu nghỉ việc không hợp lệ';
+                exit(json_encode(['success' => false, 'message' => $message]));
+            }
             exit(json_encode($result));
         
         // POST /api/hr/resignation/{id}/approve - Duyệt yêu cầu

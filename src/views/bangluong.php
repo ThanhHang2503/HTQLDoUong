@@ -435,20 +435,20 @@ if (isset($_GET['print'])) {
                             </div>
                             <input type="hidden" name="base_salary_val" id="baseSalaryHidden">
                         </div>
-                        <div class="mb-2">
-                            <label class="form-label fw-bold">Phụ cấp (VND)</label>
+                           <div class="mb-2">
+                            <label class="form-label fw-bold">Phụ cấp (VND) <span id="allowanceFmt" class="text-muted small ms-2"></span></label>
                             <input type="number" class="form-control" name="allowance" id="allowanceInput"
-                                   value="500000" min="0" step="100000" onchange="calcTotal()">
+                                value="500000" min="0" step="100000" oninput="calcTotal()" onchange="calcTotal()">
                         </div>
                         <div class="mb-2">
-                            <label class="form-label fw-bold">Thưởng (VND)</label>
+                            <label class="form-label fw-bold">Thưởng (VND) <span id="bonusFmt" class="text-muted small ms-2"></span></label>
                             <input type="number" class="form-control" name="bonus" id="bonusInput"
-                                   value="0" min="0" step="100000" onchange="calcTotal()">
+                                value="0" min="0" step="100000" oninput="calcTotal()" onchange="calcTotal()">
                         </div>
                         <div class="mb-2">
-                            <label class="form-label fw-bold">Khấu trừ (VND) <span id="leaveHint" class="text-danger small ms-2"></span></label>
+                            <label class="form-label fw-bold">Khấu trừ (VND) <span id="leaveHint" class="text-danger small ms-2"></span> <span id="deductFmt" class="text-muted small ms-1"></span></label>
                             <input type="number" class="form-control" name="deductions" id="deductInput"
-                                   value="0" min="0" step="1" onchange="calcTotal()">
+                                value="0" min="0" step="100000" oninput="calcTotal()" onchange="calcTotal()">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Thực lĩnh (ước tính)</label>
@@ -618,6 +618,22 @@ function fillBaseSalary(sel) {
     window._baseSalary = salary;
     calcTotal();
 }
+
+function formatMoney(value) {
+    const amount = parseInt(value, 10) || 0;
+    return amount.toLocaleString('vi-VN') + ' VND';
+}
+
+function updateMoneyHints() {
+    const allowance = document.getElementById('allowanceInput');
+    const bonus = document.getElementById('bonusInput');
+    const deduct = document.getElementById('deductInput');
+
+    document.getElementById('allowanceFmt').textContent = formatMoney(allowance ? allowance.value : 0);
+    document.getElementById('bonusFmt').textContent = formatMoney(bonus ? bonus.value : 0);
+    document.getElementById('deductFmt').textContent = formatMoney(deduct ? deduct.value : 0);
+}
+
 function calcTotal() {
     const base = window._baseSalary || 0;
     const allow = parseInt(document.getElementById('allowanceInput').value) || 0;
@@ -625,7 +641,12 @@ function calcTotal() {
     const deduct = parseInt(document.getElementById('deductInput').value) || 0;
     const total = base + allow + bonus - deduct;
     document.getElementById('totalDisplay').value = total.toLocaleString('vi-VN') + ' VND';
+    updateMoneyHints();
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    updateMoneyHints();
+});
 </script>
 </div>
 </div>

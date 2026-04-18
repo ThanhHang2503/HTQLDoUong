@@ -80,6 +80,11 @@ class EmployeeService {
             return ['success' => false, 'error' => 'Vui lòng cung cấp đầy đủ thông tin bắt buộc (Tên, Email, Mật khẩu, Chức vụ).'];
         }
 
+        // Validate Email định dạng chuẩn, không chứa khoảng trắng/ký tự không hợp lệ
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || preg_match('/\s/', $email)) {
+            return ['success' => false, 'error' => 'Email không đúng định dạng'];
+        }
+
         // 2. Kiểm tra email đã tồn tại hay chưa
         $check_query = "SELECT account_id FROM accounts WHERE email = '$email'";
         $check_result = mysqli_query($this->conn, $check_query);
@@ -91,6 +96,11 @@ class EmployeeService {
         $phone = trim(mysqli_real_escape_string($this->conn, $data['phone'] ?? ''));
         $address = trim(mysqli_real_escape_string($this->conn, $data['address'] ?? ''));
         $gender = in_array($data['gender'] ?? '', ['nam', 'nữ', 'khác']) ? $data['gender'] : 'nam';
+
+        // Validate số điện thoại: chỉ số, tối thiểu 10 chữ số
+        if ($phone !== '' && !preg_match('/^\d{10,}$/', $phone)) {
+            return ['success' => false, 'error' => 'Số điện thoại không đúng định dạng'];
+        }
         
         // Chuẩn hóa ngày sinh
         $birth_date = !empty($data['birth_date']) ? "'" . mysqli_real_escape_string($this->conn, $data['birth_date']) . "'" : "NULL";
@@ -155,7 +165,11 @@ class EmployeeService {
 
         // 2. Kiểm tra email nếu có thay đổi
         if (!empty($data['email']) && $data['email'] !== $current['email']) {
-            $email = mysqli_real_escape_string($this->conn, $data['email']);
+            $emailRaw = trim((string)$data['email']);
+            if (!filter_var($emailRaw, FILTER_VALIDATE_EMAIL) || preg_match('/\s/', $emailRaw)) {
+                return ['success' => false, 'error' => 'Email không đúng định dạng'];
+            }
+            $email = mysqli_real_escape_string($this->conn, $emailRaw);
             $check = mysqli_query($this->conn, "SELECT account_id FROM accounts WHERE email = '$email' AND account_id != $aid");
             if (mysqli_num_rows($check) > 0) {
                 return ['success' => false, 'error' => 'Email đã tồn tại trong hệ thống.'];
@@ -170,7 +184,11 @@ class EmployeeService {
         }
 
         if (isset($data['phone'])) {
-            $val = mysqli_real_escape_string($this->conn, trim($data['phone']));
+            $phoneRaw = trim((string)$data['phone']);
+            if ($phoneRaw !== '' && !preg_match('/^\d{10,}$/', $phoneRaw)) {
+                return ['success' => false, 'error' => 'Số điện thoại không đúng định dạng'];
+            }
+            $val = mysqli_real_escape_string($this->conn, $phoneRaw);
             $updates[] = "phone = '$val'";
         }
 
@@ -605,12 +623,36 @@ class LeaveService {
      * Tạo yêu cầu nghỉ phép
      */
     public function requestLeave(int $account_id, array $data): array {
+        $fromDate = trim((string)($data['from_date'] ?? ''));
+        $toDate = trim((string)($data['to_date'] ?? ''));
+        $reason = trim((string)($data['reason'] ?? ''));
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
+
+        $fromValid = \DateTime::createFromFormat('Y-m-d', $fromDate) && \DateTime::createFromFormat('Y-m-d', $fromDate)->format('Y-m-d') === $fromDate;
+        $toValid = \DateTime::createFromFormat('Y-m-d', $toDate) && \DateTime::createFromFormat('Y-m-d', $toDate)->format('Y-m-d') === $toDate;
+
+        if (!$fromValid || !$toValid) {
+            return ['success' => false, 'error' => 'Ngày nghỉ không hợp lệ. Vui lòng chọn đúng định dạng ngày.'];
+        }
+
+        if ($fromDate < $tomorrow) {
+            return ['success' => false, 'error' => 'Ngày bắt đầu nghỉ phép phải từ ngày mai trở đi.'];
+        }
+
+        if ($toDate < $fromDate) {
+            return ['success' => false, 'error' => 'Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.'];
+        }
+
+        if ($reason === '') {
+            return ['success' => false, 'error' => 'Lý do không được để trống.'];
+        }
+
         $leave = new LeaveRequest([
             'account_id' => $account_id,
-            'from_date' => $data['from_date'],
-            'to_date' => $data['to_date'],
+            'from_date' => $fromDate,
+            'to_date' => $toDate,
             'leave_type' => $data['leave_type'] ?? 'phép',
-            'reason' => $data['reason'],
+            'reason' => $reason,
         ]);
         
         $request_id = $this->leaveRepo->create($leave);
@@ -678,11 +720,26 @@ class ResignationService {
      * Tạo yêu cầu nghỉ việc
      */
     public function requestResignation(int $account_id, array $data): array {
+        $effectiveDate = trim((string)($data['effective_date'] ?? ''));
+        $reason = trim((string)($data['reason'] ?? ''));
+        $tomorrow = date('Y-m-d', strtotime('+1 day'));
+
+        $effectiveValid = \DateTime::createFromFormat('Y-m-d', $effectiveDate)
+            && \DateTime::createFromFormat('Y-m-d', $effectiveDate)->format('Y-m-d') === $effectiveDate;
+
+        if (!$effectiveValid || $effectiveDate < $tomorrow) {
+            return ['success' => false, 'error' => 'Ngày nghỉ việc phải từ ngày mai trở đi'];
+        }
+
+        if ($reason === '') {
+            return ['success' => false, 'error' => 'Lý do không được để trống.'];
+        }
+
         $resign = new ResignationRequest([
             'account_id' => $account_id,
             'notice_date' => date('Y-m-d'),
-            'effective_date' => $data['effective_date'],
-            'reason' => $data['reason'],
+            'effective_date' => $effectiveDate,
+            'reason' => $reason,
         ]);
         
         $request_id = $this->resignRepo->create($resign);

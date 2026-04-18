@@ -16,13 +16,22 @@ $msg_error   = '';
 if (isset($_POST['submit_leave'])) {
     $from_date  = trim($_POST['from_date'] ?? '');
     $to_date    = trim($_POST['to_date'] ?? '');
+    $today      = date('Y-m-d');
+    $tomorrow   = date('Y-m-d', strtotime('+1 day'));
     $leave_type = $_POST['leave_type'] ?? 'phép';
     $reason     = trim(mysqli_real_escape_string($conn, $_POST['reason'] ?? ''));
     $valid_types = ['phép','bệnh','thai sản','không lương','khác'];
     if (!in_array($leave_type, $valid_types)) $leave_type = 'phép';
 
-    if ($from_date > $to_date) {
-        $msg_error = 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.';
+    $from_valid = DateTime::createFromFormat('Y-m-d', $from_date) && DateTime::createFromFormat('Y-m-d', $from_date)->format('Y-m-d') === $from_date;
+    $to_valid = DateTime::createFromFormat('Y-m-d', $to_date) && DateTime::createFromFormat('Y-m-d', $to_date)->format('Y-m-d') === $to_date;
+
+    if (!$from_valid || !$to_valid) {
+        $msg_error = 'Ngày nghỉ không hợp lệ. Vui lòng chọn đúng định dạng ngày.';
+    } elseif ($from_date < $tomorrow) {
+        $msg_error = 'Ngày bắt đầu nghỉ phép phải từ ngày mai trở đi.';
+    } elseif ($to_date < $from_date) {
+        $msg_error = 'Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.';
     } elseif ($reason === '') {
         $msg_error = 'Lý do không được để trống.';
     } else {
@@ -136,12 +145,16 @@ $status_class = ['chờ duyệt'=>'warning','chấp thuận'=>'success','từ ch
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Từ ngày</label>
                                 <input type="date" class="form-control" name="from_date"
-                                       value="<?= date('Y-m-d') ?>" required>
+                                       id="fromDateInput"
+                                       value="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+                                       min="<?= date('Y-m-d', strtotime('+1 day')) ?>" required>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Đến ngày</label>
                                 <input type="date" class="form-control" name="to_date"
-                                       value="<?= date('Y-m-d') ?>" required>
+                                       id="toDateInput"
+                                       value="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+                                       min="<?= date('Y-m-d', strtotime('+1 day')) ?>" required>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Lý do</label>
@@ -272,6 +285,28 @@ $status_class = ['chờ duyệt'=>'warning','chấp thuận'=>'success','từ ch
     </div>
 </div>
 <script>
+document.addEventListener('DOMContentLoaded', function () {
+    const fromInput = document.getElementById('fromDateInput');
+    const toInput = document.getElementById('toDateInput');
+    if (!fromInput || !toInput) {
+        return;
+    }
+
+    const syncToDateMin = function () {
+        const fromVal = fromInput.value;
+        if (!fromVal) {
+            return;
+        }
+        toInput.min = fromVal;
+        if (toInput.value < fromVal) {
+            toInput.value = fromVal;
+        }
+    };
+
+    syncToDateMin();
+    fromInput.addEventListener('change', syncToDateMin);
+});
+
 function showApproveModal(id, action) {
     document.getElementById('modalLeaveId').value = id;
     document.getElementById('modalApproveAction').value = action;
