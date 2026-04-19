@@ -237,10 +237,11 @@ class SalaryRepository {
         $deduct = (int)$record->deductions;
         $total = (int)$record->total_salary;
         $notes = mysqli_real_escape_string($this->conn, $record->notes ?? '');
+        $status = mysqli_real_escape_string($this->conn, $record->status ?? 'draft');
         
         $query = "INSERT INTO salary_records 
-                  (account_id, position_id, salary_month, salary_year, base_salary, allowance, bonus, deductions, total_salary, notes) 
-                  VALUES ($aid, $pid, $m, $y, $base, $allow, $bonus, $deduct, $total, '$notes')";
+                  (account_id, position_id, salary_month, salary_year, base_salary, allowance, bonus, deductions, total_salary, notes, status) 
+                  VALUES ($aid, $pid, $m, $y, $base, $allow, $bonus, $deduct, $total, '$notes', '$status')";
         
         if (mysqli_query($this->conn, $query)) {
             return (int)mysqli_insert_id($this->conn);
@@ -254,9 +255,10 @@ class SalaryRepository {
         $deduct = (int)$record->deductions;
         $total = (int)$record->total_salary;
         $notes = mysqli_real_escape_string($this->conn, $record->notes ?? '');
+        $status = mysqli_real_escape_string($this->conn, $record->status ?? 'draft');
         
         $query = "UPDATE salary_records SET allowance = $allow, bonus = $bonus, 
-                  deductions = $deduct, total_salary = $total, notes = '$notes' 
+                  deductions = $deduct, total_salary = $total, notes = '$notes', status = '$status' 
                   WHERE salary_record_id = {$record->salary_record_id}";
         
         return (bool)mysqli_query($this->conn, $query);

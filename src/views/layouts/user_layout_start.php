@@ -69,15 +69,16 @@ if (isset($_GET['home'])) {
     $currentTitle = 'Thống kê';
 }
 
-// Đếm đơn chờ duyệt (cho manager/admin)
-$pending_count = 0;
+// Đếm đơn chờ duyệt (cho Quản lý nhân sự)
+$pending_leave_count = 0;
+$pending_resignation_count = 0;
 if ($isManagerOrAdmin) {
     global $conn;
     $pc = mysqli_query($conn, "SELECT COUNT(*) FROM leave_requests WHERE status='chờ duyệt'");
+    $pending_leave_count = $pc ? (int)mysqli_fetch_row($pc)[0] : 0;
+    
     $pr = mysqli_query($conn, "SELECT COUNT(*) FROM resignation_requests WHERE status='chờ duyệt'");
-    $count_leave = ($pc && mysqli_num_rows($pc) > 0) ? (int)mysqli_fetch_row($pc)[0] : 0;
-    $count_resig = ($pr && mysqli_num_rows($pr) > 0) ? (int)mysqli_fetch_row($pr)[0] : 0;
-    $pending_count = $count_leave + $count_resig;
+    $pending_resignation_count = $pr ? (int)mysqli_fetch_row($pr)[0] : 0;
 }
 ?>
 
@@ -176,14 +177,19 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
                     <a class="text-truncate <?= isset($_GET['donnghi']) ? 'active' : '' ?>"
                        href="user_page.php?donnghi">
                         <i class="fa-solid fa-calendar-check"></i> Đơn nghỉ phép
-                        <?php if ($pending_count > 0): ?>
-                        <span class="badge text-bg-danger"><?= $pending_count ?></span>
+                        <?php if ($pending_leave_count > 0): ?>
+                        <span class="badge text-bg-danger"><?= $pending_leave_count ?></span>
                         <?php endif; ?>
                     </a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['donnghiviec']) ? 'active' : '' ?>"
-                       href="user_page.php?donnghiviec"><i class="fa-solid fa-door-open"></i> Đơn nghỉ việc</a>
+                       href="user_page.php?donnghiviec">
+                        <i class="fa-solid fa-door-open"></i> Đơn nghỉ việc
+                        <?php if ($pending_resignation_count > 0): ?>
+                        <span class="badge text-bg-danger"><?= $pending_resignation_count ?></span>
+                        <?php endif; ?>
+                    </a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['profile']) ? 'active' : '' ?>"

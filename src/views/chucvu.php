@@ -277,7 +277,7 @@ function viewHistory(accId, name) {
             let html = '<div class="table-responsive"><table class="table table-striped table-hover mb-0"><thead><tr class="table-light"><th>Chức vụ</th><th>Từ ngày</th><th>Đến ngày</th></tr></thead><tbody>';
             if (data && data.length > 0) {
                 data.forEach(h => {
-                    const end = h.end_date ? h.end_date : '<span class="badge bg-success">Hiện tại</span>';
+                    const end = h.end_date ? h.end_date : '<span class="text-muted">...</span>';
                     html += `<tr><td class="fw-bold text-primary">${h.position_name}</td><td>${h.start_date}</td><td>${end}</td></tr>`;
                 });
                 html += '</tbody></table></div>';

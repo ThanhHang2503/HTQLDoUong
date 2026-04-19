@@ -14,65 +14,7 @@ $sql = "SELECT a.account_id, a.full_name, a.email, a.phone, a.address, a.birth_d
 $result = mysqli_query($conn, $sql);
 $profile = mysqli_fetch_assoc($result);
 
-// Xử lý cập nhật thông tin
-if (isset($_POST['update_profile'])) {
-    $full_name = trim(htmlspecialchars($_POST['full_name'] ?? ''));
-    $phone     = trim(mysqli_real_escape_string($conn, $_POST['phone'] ?? ''));
-    $address   = trim(mysqli_real_escape_string($conn, $_POST['address'] ?? ''));
-    $birth_date = trim($_POST['birth_date'] ?? '');
-    $gender    = in_array($_POST['gender'] ?? '', ['nam','nữ','khác']) ? $_POST['gender'] : null;
-
-    if ($full_name === '') {
-        setNotify('error', 'Họ tên không được để trống.');
-    } else {
-        $safe_name = mysqli_real_escape_string($conn, $full_name);
-        $bd_sql = $birth_date ? "'$birth_date'" : 'NULL';
-        $gd_sql = $gender ? "'$gender'" : 'NULL';
-        $upd = "UPDATE accounts SET full_name='$safe_name', phone='$phone',
-                address='$address', birth_date=$bd_sql, gender=$gd_sql
-                WHERE account_id = $uid";
-        mysqli_query($conn, $upd);
-        $_SESSION['full_name'] = $full_name;
-        setNotify('success', 'Cập nhật thông tin thành công!');
-    }
-    redirect('user_page.php?profile'); 
-    exit;
-}
-
-// Đổi mật khẩu
-if (isset($_POST['change_password'])) {
-    $password_input = $_POST['old_password'] ?? '';
-    $new_pass = trim($_POST['new_password'] ?? '');
-    $cnf_pass = trim($_POST['confirm_password'] ?? '');
-
-    // Lấy hash hiện tại từ database
-    $chk = mysqli_query($conn, "SELECT password FROM accounts WHERE account_id=$uid");
-    $row = mysqli_fetch_assoc($chk);
-    $stored_hash = $row['password'] ?? '';
-
-    $old_verified = false;
-    // Kiểm tra mật khẩu cũ (hỗ trợ cả BCRYPT và MD5)
-    if (password_verify($password_input, $stored_hash)) {
-        $old_verified = true;
-    } else if (md5($password_input) === $stored_hash) {
-        $old_verified = true;
-    }
-
-    if (!$old_verified) {
-        setNotify('error', 'Mật khẩu hiện tại không đúng.');
-    } elseif (strlen($new_pass) < 6) {
-        setNotify('error', 'Mật khẩu mới phải có ít nhất 6 ký tự.');
-    } elseif ($new_pass !== $cnf_pass) {
-        setNotify('error', 'Xác nhận mật khẩu không khớp.');
-    } else {
-        // Mã hóa mật khẩu mới bằng BCRYPT
-        $np = password_hash($new_pass, PASSWORD_DEFAULT);
-        mysqli_query($conn, "UPDATE accounts SET password='$np' WHERE account_id=$uid");
-        setNotify('success', 'Đổi mật khẩu thành công!');
-    }
-    redirect('user_page.php?profile'); 
-    exit;
-}
+// 2. Không xử lý POST tại đây nữa, đã chuyển sang AJAX (api/user/profile.php)
 
 // Lấy lịch sử chức vụ
 $pos_sql = "SELECT eph.start_date, eph.end_date, p.position_name, p.base_salary, eph.reason
@@ -111,7 +53,7 @@ usort($pos_history, function($a, $b) {
                         <i class="fa-solid fa-user-pen me-2"></i>Cập Nhật Thông Tin
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="">
+                        <form id="formUpdateProfile">
                             <div class="row g-2">
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Họ và Tên *</label>
@@ -123,14 +65,16 @@ usort($pos_history, function($a, $b) {
                                     <input type="email" class="form-control" value="<?= htmlspecialchars($profile['email'] ?? '') ?>" disabled>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Số điện thoại</label>
+                                    <label class="form-label fw-bold">Số điện thoại (9-11 số)</label>
                                     <input type="text" class="form-control" name="phone"
-                                           value="<?= htmlspecialchars($profile['phone'] ?? '') ?>">
+                                           value="<?= htmlspecialchars($profile['phone'] ?? '') ?>"
+                                           pattern="[0-9]{9,11}" title="Chỉ nhập số, độ dài 9-11 ký tự">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Ngày sinh</label>
+                                    <label class="form-label fw-bold">Ngày sinh (Phải đủ 18 tuổi)</label>
                                     <input type="date" class="form-control" name="birth_date"
-                                           value="<?= htmlspecialchars($profile['birth_date'] ?? '') ?>">
+                                           value="<?= htmlspecialchars($profile['birth_date'] ?? '') ?>"
+                                           max="<?= (date('Y') - 18) . '-12-31' ?>">
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Giới tính</label>
@@ -150,8 +94,9 @@ usort($pos_history, function($a, $b) {
                                     <textarea class="form-control" name="address" rows="2"><?= htmlspecialchars($profile['address'] ?? '') ?></textarea>
                                 </div>
                             </div>
+                            <div id="profileMsg" class="mt-2"></div>
                             <div class="mt-3">
-                                <button type="submit" name="update_profile" class="btn btn-primary fw-bold">
+                                <button type="submit" id="btnSaveProfile" class="btn btn-primary fw-bold">
                                     <i class="fa-solid fa-floppy-disk me-1"></i>Lưu thay đổi
                                 </button>
                             </div>
@@ -165,7 +110,7 @@ usort($pos_history, function($a, $b) {
                         <i class="fa-solid fa-lock me-2"></i>Đổi Mật Khẩu
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="">
+                        <form id="formChangePassword">
                             <div class="row g-2">
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Mật khẩu hiện tại</label>
@@ -180,8 +125,9 @@ usort($pos_history, function($a, $b) {
                                     <input type="password" class="form-control" name="confirm_password" required>
                                 </div>
                             </div>
+                            <div id="passwordMsg" class="mt-2"></div>
                             <div class="mt-3">
-                                <button type="submit" name="change_password" class="btn btn-warning fw-bold">
+                                <button type="submit" id="btnSavePassword" class="btn btn-warning fw-bold">
                                     <i class="fa-solid fa-key me-1"></i>Đổi mật khẩu
                                 </button>
                             </div>
@@ -226,7 +172,7 @@ usort($pos_history, function($a, $b) {
                                 <tr>
                                     <td><?= htmlspecialchars($ph['position_name']) ?></td>
                                     <td><?= date('d/m/Y', strtotime($ph['start_date'])) ?></td>
-                                    <td><?= $ph['end_date'] ? date('d/m/Y', strtotime($ph['end_date'])) : '<span class="badge text-bg-success">Hiện tại</span>' ?></td>
+                                    <td><?= $ph['end_date'] ? date('d/m/Y', strtotime($ph['end_date'])) : '<span class="badge text-bg-success">...</span>' ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                                 <?php if ($show_hire_virtual): ?>
@@ -249,3 +195,98 @@ usort($pos_history, function($a, $b) {
 </div>
 </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Xử lý lưu hồ sơ
+    const formProfile = document.getElementById('formUpdateProfile');
+    formProfile.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btnSaveProfile');
+        const msg = document.getElementById('profileMsg');
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...';
+        msg.innerHTML = '';
+
+        const payload = {
+            update_profile: true,
+            full_name: formProfile.querySelector('[name="full_name"]').value,
+            phone: formProfile.querySelector('[name="phone"]').value,
+            birth_date: formProfile.querySelector('[name="birth_date"]').value,
+            gender: formProfile.querySelector('[name="gender"]').value,
+            address: formProfile.querySelector('[name="address"]').value
+        };
+
+        try {
+            const res = await fetch('api/user/profile.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                msg.innerHTML = `<div class="alert alert-success mt-2 py-2"><i class="fa-solid fa-circle-check me-2"></i>${result.message}</div>`;
+                // Cập nhật tên trên header nếu có thay đổi
+                const headName = document.querySelector('.head-name');
+                if (headName) {
+                    // Cập nhật text liên quan nếu cần
+                }
+            } else {
+                msg.innerHTML = `<div class="alert alert-danger mt-2 py-2"><i class="fa-solid fa-circle-xmark me-2"></i>${result.message}</div>`;
+            }
+        } catch (err) {
+            msg.innerHTML = `<div class="alert alert-danger mt-2 py-2"><i class="fa-solid fa-triangle-exclamation me-2"></i>Không thể kết nối tới máy chủ.</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i>Lưu thay đổi';
+        }
+    });
+
+    // 2. Xử lý đổi mật khẩu
+    const formPassword = document.getElementById('formChangePassword');
+    formPassword.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btnSavePassword');
+        const msg = document.getElementById('passwordMsg');
+
+        if (formPassword.querySelector('[name="new_password"]').value !== formPassword.querySelector('[name="confirm_password"]').value) {
+            msg.innerHTML = `<div class="alert alert-danger mt-2 py-2">Xác nhận mật khẩu mới không khớp.</div>`;
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+        msg.innerHTML = '';
+
+        const payload = {
+            change_password: true,
+            old_password: formPassword.querySelector('[name="old_password"]').value,
+            new_password: formPassword.querySelector('[name="new_password"]').value,
+            confirm_password: formPassword.querySelector('[name="confirm_password"]').value
+        };
+
+        try {
+            const res = await fetch('api/user/profile.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                msg.innerHTML = `<div class="alert alert-success mt-2 py-2"><i class="fa-solid fa-circle-check me-2"></i>${result.message}</div>`;
+                formPassword.reset();
+            } else {
+                msg.innerHTML = `<div class="alert alert-danger mt-2 py-2"><i class="fa-solid fa-circle-xmark me-2"></i>${result.message}</div>`;
+            }
+        } catch (err) {
+            msg.innerHTML = `<div class="alert alert-danger mt-2 py-2"><i class="fa-solid fa-triangle-exclamation me-2"></i>Không thể kết nối tới máy chủ.</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-key me-1"></i>Đổi mật khẩu';
+        }
+    });
+});
+</script>

@@ -1,0 +1,7 @@
+<?php
+require 'config.php';
+global $conn;
+$res = mysqli_query($conn, 'SHOW TABLES');
+while($row = mysqli_fetch_row($res)) {
+    echo $row[0] . "\n";
+}

@@ -1,176 +1,39 @@
 <?php
 // Bảng lương - Manager tính và lưu lương cho nhân viên
 requirePermission(AppPermission::MANAGE_STAFF);
+
+use HR\Services\SalaryService;
+use HR\Repositories\SalaryRepository;
+
 global $conn;
+$salaryRepo = new SalaryRepository($conn);
+$salaryService = new SalaryService($conn);
+
+$curMonth = (int)date('n');
+$curYear = (int)date('Y');
 
 $msg_success = '';
 $msg_error   = '';
 
-$sel_month = (int)($_GET['month'] ?? date('m'));
-$sel_year  = (int)($_GET['year'] ?? date('Y'));
+$sel_month = (int)($_GET['month'] ?? $curMonth);
+$sel_year  = (int)($_GET['year'] ?? $curYear);
 $sel_year  = max(2020, min($sel_year, 2030));
 
-/**
- * Tính khấu trừ tự động dựa trên số ngày nghỉ và chức vụ tại thời điểm nghỉ
- * Công thức: Σ (Lương CB của chức vụ lúc đó / 30) * số ngày nghỉ tương ứng
- */
-function getAutoDeduction($conn, $accountId, $month, $year) {
-    $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
-    $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
-    
-    // Lấy tất cả các ngày nghỉ được chấp thuận trong tháng (để hiển thị gợi ý)
-    $sql = "SELECT from_date, to_date FROM leave_requests 
-            WHERE account_id = $accountId AND status = 'chấp thuận'
-            AND from_date <= '$endOfMonth' AND to_date >= '$startOfMonth'";
-    $res = mysqli_query($conn, $sql);
-    
-    $leaveDates = [];
-    if ($res) {
-        while ($row = mysqli_fetch_assoc($res)) {
-            $curr = max(strtotime($row['from_date']), strtotime($startOfMonth));
-            $last = min(strtotime($row['to_date']), strtotime($endOfMonth));
-            while ($curr <= $last) {
-                $leaveDates[] = date('Y-m-d', $curr);
-                $curr = strtotime('+1 day', $curr);
-            }
-        }
-    }
-    $leaveDates = array_unique($leaveDates);
-    
-    // Trả về 0 cho số tiền (vì đã trừ vào base salary qua số ngày làm)
-    return ['total' => 0, 'days' => count($leaveDates)];
+$isPastMonth = ($sel_year < $curYear) || ($sel_year == $curYear && $sel_month < $curMonth);
+
+// Chặn tháng tương lai (xét theo tháng và năm)
+$cur_m = (int)date('n');
+$cur_y = (int)date('Y');
+$future_blocked = false;
+if ($sel_year > $cur_y || ($sel_year == $cur_y && $sel_month > $cur_m)) {
+    $future_blocked = true;
+    $msg_error = 'Không thể tính lương cho tháng tương lai.';
 }
 
-/**
- * Tính lương cơ bản gộp (Pro-rated) dựa trên lịch sử chức vụ
- * Công thức: Σ (Số ngày giữ chức vụ / 30) * Lương CB của chức vụ đó
- */
-function getProRatedBaseSalary($conn, $accountId, $month, $year, $hireDate = null) {
-    if (!$hireDate) {
-        $hireSql = "SELECT hire_date FROM accounts WHERE account_id = $accountId";
-        $hireRes = mysqli_query($conn, $hireSql);
-        $hireData = mysqli_fetch_assoc($hireRes);
-        $hireDate = $hireData['hire_date'] ?? '2000-01-01';
-    }
-    
-    $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
-    $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
-    $totalDaysInMonth = (int)date('t', strtotime($startOfMonth));
+$startOfMonth = sprintf("%04d-%02d-01", $sel_year, $sel_month);
+$endOfMonth = date('Y-m-t', strtotime($startOfMonth));
+$totalDaysInMonth = (int)date('t', strtotime($startOfMonth));
 
-    // 1. Lấy ngày nghỉ không lương (không tính lương cho các ngày này)
-    $leaveSql = "SELECT from_date, to_date FROM leave_requests 
-                 WHERE account_id = $accountId AND status = 'chấp thuận' AND leave_type = 'không lương'
-                 AND from_date <= '$endOfMonth' AND to_date >= '$startOfMonth'";
-    $leaveRes = mysqli_query($conn, $leaveSql);
-    $unpaidLeaveDates = [];
-    if ($leaveRes) {
-        while ($l = mysqli_fetch_assoc($leaveRes)) {
-            $curr = max(strtotime($l['from_date']), strtotime($startOfMonth));
-            $last = min(strtotime($l['to_date']), strtotime($endOfMonth));
-            while ($curr <= $last) {
-                $unpaidLeaveDates[date('Y-m-d', $curr)] = true;
-                $curr = strtotime('+1 day', $curr);
-            }
-        }
-    }
-
-    // 2. Lấy lịch sử chức vụ (Lấy thêm position_id để phân biệt)
-    $historySql = "SELECT eph.start_date, eph.end_date, p.base_salary, p.position_id
-                   FROM employee_positions_history eph
-                   JOIN positions p ON p.position_id = eph.position_id
-                   WHERE eph.account_id = $accountId
-                   AND eph.start_date <= '$endOfMonth'
-                   AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')
-                   ORDER BY eph.start_date ASC";
-    $histRes = mysqli_query($conn, $historySql);
-    $history = $histRes ? mysqli_fetch_all($histRes, MYSQLI_ASSOC) : [];
-
-    // Nếu không có lịch sử, dùng chức vụ hiện tại
-    if (empty($history)) {
-        $sql = "SELECT p.base_salary, p.position_id FROM accounts a 
-                JOIN positions p ON p.position_id = a.position_id 
-                WHERE a.account_id = $accountId";
-        $cp_res = mysqli_query($conn, $sql);
-        $cp = mysqli_fetch_assoc($cp_res);
-        $history[] = [
-            'start_date' => '2000-01-01',
-            'end_date' => '2099-12-31',
-            'base_salary' => $cp['base_salary'] ?? 0,
-            'position_id' => $cp['position_id'] ?? 0
-        ];
-    }
-
-    $workingDaysByPos = []; 
-    $totalWorkingDays = 0;
-
-    for ($d = 1; $d <= $totalDaysInMonth; $d++) {
-        $dateStr = sprintf("%04d-%02d-%02d", $year, $month, $d);
-        $ts = strtotime($dateStr);
-
-        $currentPos = null;
-        foreach ($history as $h) {
-            $sTs = strtotime($h['start_date']);
-            $eTs = $h['end_date'] ? strtotime($h['end_date']) : strtotime('2099-12-31');
-            if ($ts >= $sTs && $ts <= $eTs) {
-                $currentPos = $h;
-                break;
-            }
-        }
-
-        if ($currentPos && !isset($unpaidLeaveDates[$dateStr])) {
-            $sal = (int)$currentPos['base_salary'];
-            $pid = (int)$currentPos['position_id'];
-            if (!isset($workingDaysByPos[$pid])) {
-                $workingDaysByPos[$pid] = ['days' => 0, 'base_salary' => $sal, 'position_id' => $pid];
-            }
-            $workingDaysByPos[$pid]['days']++;
-            $totalWorkingDays++;
-        } elseif (!$currentPos && !isset($unpaidLeaveDates[$dateStr]) && $ts >= strtotime($hireDate)) {
-            // Gap handling: If before first history entry but after hire date, use earliest history entry as proxy
-            if (!empty($history)) {
-                $firstPos = $history[0]; // history is sorted by start_date ASC
-                $sal = (int)$firstPos['base_salary'];
-                $pid = (int)$firstPos['position_id'];
-                if (!isset($workingDaysByPos[$pid])) {
-                    $workingDaysByPos[$pid] = ['days' => 0, 'base_salary' => $sal, 'position_id' => $pid];
-                }
-                $workingDaysByPos[$pid]['days']++;
-                $totalWorkingDays++;
-            }
-        }
-    }
-
-    $finalBaseSalary = 0;
-    $distinctPositionsCount = count($workingDaysByPos);
-
-    if ($distinctPositionsCount >= 2) {
-        // TRƯỜNG HỢP ≥ 2 CHỨC VỤ: Tính theo tỷ lệ ngày làm thực tế (chia 30), không áp dụng 28 ngày
-        foreach ($workingDaysByPos as $pos) {
-            $finalBaseSalary += ($pos['days'] * $pos['base_salary'] / 30);
-        }
-    } elseif ($distinctPositionsCount === 1) {
-        // TRƯỜNG HỢP 1 CHỨC VỤ: Áp dụng định mức 28 ngày
-        $pos = reset($workingDaysByPos); // Lấy chức vụ duy nhất
-        if ($totalWorkingDays >= 28) {
-            $finalBaseSalary = $pos['base_salary'];
-        } else {
-            $finalBaseSalary = ($totalWorkingDays * $pos['base_salary'] / 30);
-        }
-    }
-
-    $reason = '';
-    if ($distinctPositionsCount >= 2) {
-        $reason = 'multi';
-    } elseif ($distinctPositionsCount === 1 && $totalWorkingDays < 28) {
-        $reason = 'less_28';
-    }
-
-    return [
-        'total' => round($finalBaseSalary),
-        'working_days' => $totalWorkingDays,
-        'prorate_reason' => $reason
-    ];
-}
 
 // Lưu/cập nhật lương
 if (isset($_POST['save_salary'])) {
@@ -183,14 +46,25 @@ if (isset($_POST['save_salary'])) {
     $notes      = trim(mysqli_real_escape_string($conn, $_POST['notes'] ?? ''));
     $by         = currentUserId();
 
-    if ($acc_id > 0) {
-        $base_salary = (int)($_POST['base_salary_val'] ?? 0); // Lấy giá trị thực tế truyền từ UI
-        $call = "CALL CalculateEmployeeSalary($acc_id, $month, $year, $base_salary, $allowance, $bonus, $deductions, $by, '$notes')";
-        if (mysqli_multi_query($conn, $call)) {
-            do { $r = mysqli_store_result($conn); if ($r) mysqli_free_result($r); } while (mysqli_more_results($conn) && mysqli_next_result($conn));
-            $msg_success = 'Đã tính và lưu lương thành công.';
+    // Chặn tháng tương lai ở backend
+    $cur_m = (int)date('n');
+    $cur_y = (int)date('Y');
+    if ($year > $cur_y || ($year == $cur_y && $month > $cur_m)) {
+        $msg_error = 'Không thể tính lương cho tháng tương lai (Backend blocked).';
+    } elseif ($acc_id > 0) {
+        $salaryData = [
+            'allowance' => $allowance,
+            'bonus' => $bonus,
+            'deductions' => $deductions,
+            'notes' => $notes
+        ];
+        
+        $saveResult = $salaryService->saveSalary($acc_id, $month, $year, $salaryData);
+        
+        if ($saveResult['success']) {
+            $msg_success = $saveResult['message'];
         } else {
-            $msg_error = 'Lỗi: ' . mysqli_error($conn);
+            $msg_error = $saveResult['error'];
         }
     }
 }
@@ -202,30 +76,48 @@ if (isset($_POST['delete_salary'])) {
     $msg_success = 'Đã xóa bản ghi lương.';
 }
 
-// Danh sách nhân viên (để tính lương)
-$emp_sql = "SELECT a.account_id, a.full_name, a.hire_date, r.display_name AS role_name,
-                   p.position_name, p.base_salary
-            FROM accounts a
-            JOIN roles r ON r.id = a.role_id
-            LEFT JOIN positions p ON p.position_id = a.position_id
-            WHERE a.hr_status = 'active' AND a.role_id != 1
-            ORDER BY a.full_name";
-$emp_result = mysqli_query($conn, $emp_sql);
+// Danh sách nhân viên (để tính lương) - Lọc theo tháng phát sinh làm việc
 $employees = [];
-if ($emp_result) {
-    while ($e = mysqli_fetch_assoc($emp_result)) {
-        // Khấu trừ nghỉ
-        $deductInfo = getAutoDeduction($conn, $e['account_id'], $sel_month, $sel_year);
-        $e['auto_deduction'] = $deductInfo['total'];
-        $e['leave_days'] = $deductInfo['days'];
+if (!$future_blocked) {
+    $emp_sql = "SELECT a.account_id, a.full_name, a.hire_date, a.resignation_date, r.display_name AS role_name,
+                       p.position_name, p.base_salary,
+                       sr.status as salary_status, sr.salary_record_id
+                FROM accounts a
+                JOIN roles r ON r.id = a.role_id
+                LEFT JOIN positions p ON p.position_id = a.position_id
+                LEFT JOIN salary_records sr ON a.account_id = sr.account_id 
+                   AND sr.salary_month = $sel_month AND sr.salary_year = $sel_year
+                WHERE a.role_id != 1
+                  AND a.hire_date <= '$endOfMonth'
+                  AND (a.resignation_date IS NULL OR a.resignation_date >= '$startOfMonth')
+                ORDER BY a.full_name";
+    $emp_result = mysqli_query($conn, $emp_sql);
+    if ($emp_result) {
+        while ($e = mysqli_fetch_assoc($emp_result)) {
+            // Sử dụng SalaryService để tính toán chuẩn hóa
+            $calc = $salaryService->calculateSalary($e['account_id'], $sel_month, $sel_year);
+            
+            if ($calc['success']) {
+                $e['base_salary'] = $calc['pro_rated_base'];
+                $e['working_days'] = $calc['actual_active_days'];
+                $e['effective_days'] = $calc['effective_days'];
+                $e['prorate_reason'] = $calc['actual_active_days'] < $totalDaysInMonth ? 'pro_rated' : '';
+                
+                // Hiển thị gợi ý nghỉ phép từ bảng leave_requests (chỉ để tham khảo)
+                $leave_sql = "SELECT COUNT(*) as days FROM leave_requests 
+                             WHERE account_id = {$e['account_id']} AND status = 'chấp thuận'
+                             AND from_date <= '$endOfMonth' AND to_date >= '$startOfMonth'";
+                $l_res = mysqli_query($conn, $leave_sql);
+                $l_data = mysqli_fetch_assoc($l_res);
+                $e['leave_days'] = (int)($l_data['days'] ?? 0);
+                $e['auto_deduction'] = 0; // Đã khấu trừ trực tiếp vào base_salary
 
-        // Lương cơ bản gộp (Pro-rated)
-        $proRateInfo = getProRatedBaseSalary($conn, $e['account_id'], $sel_month, $sel_year, $e['hire_date']);
-        $e['base_salary'] = $proRateInfo['total'];
-        $e['working_days'] = $proRateInfo['working_days'];
-        $e['prorate_reason'] = $proRateInfo['prorate_reason'];
-
-        $employees[] = $e;
+                // CHỈ HIỂN THỊ NẾU CÓ NGÀY LÀM VIỆC (Requirement #4)
+                if ($e['working_days'] > 0) {
+                    $employees[] = $e;
+                }
+            }
+        }
     }
 }
 
@@ -345,49 +237,24 @@ if (isset($_GET['print'])) {
             </form>
         </div>
         <div class="col-auto ms-auto">
+            <?php if (!$future_blocked): ?>
             <a class="btn btn-outline-secondary"
                href="user_page.php?bangluong&month=<?=$sel_month?>&year=<?=$sel_year?>&print=1">
                 <i class="fa-solid fa-print me-1"></i>In bảng lương
             </a>
+            <?php endif; ?>
         </div>
     </div>
 
-    <!-- Tóm tắt thống kê -->
-    <div class="row g-2 mb-3">
-        <div class="col-md-2">
-            <div class="card text-center border-primary">
-                <div class="card-body p-2">
-                    <div class="fs-5 fw-bold text-primary"><?= count($salary_records) ?></div>
-                    <small>Đã tính lương</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-2">
-            <div class="card text-center border-warning">
-                <div class="card-body p-2">
-                    <div class="fs-5 fw-bold text-warning"><?= count($missing_employees) ?></div>
-                    <small>Chưa tính lương</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center border-success">
-                <div class="card-body p-2">
-                    <div class="fs-6 fw-bold text-success"><?= number_format($total_pay,0,',','.') ?></div>
-                    <small>Tổng quỹ lương (VND)</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center border-info">
-                <div class="card-body p-2">
-                    <div class="fs-6 fw-bold text-info"><?= number_format($total_bonus,0,',','.') ?></div>
-                    <small>Tổng thưởng (VND)</small>
-                </div>
-            </div>
-        </div>
     </div>
 
+    <?php if ($future_blocked): ?>
+        <div class="alert alert-info py-4 text-center">
+            <i class="fa-solid fa-calendar-xmark fa-3x mb-3 text-secondary"></i>
+            <h3>Dữ liệu bảng lương không khả dụng</h3>
+            <p class="mb-0">Bạn đang chọn tháng <strong><?= $sel_month ?>/<?= $sel_year ?></strong> nằm trong tương lai. <br>Hệ thống chỉ cho phép xem và tính lương cho tháng hiện tại hoặc các tháng trước đó.</p>
+        </div>
+    <?php else: ?>
     <div class="row g-3">
         <!-- Form tính lương -->
         <div class="col-lg-4">
@@ -418,22 +285,28 @@ if (isset($_GET['print'])) {
                                         data-leave="<?= $emp['leave_days'] ?>"
                                         data-prorate-reason="<?= $emp['prorate_reason'] ?>"
                                         data-pos="<?= htmlspecialchars($emp['position_name'] ?? '') ?>"
-                                        data-days="<?= $emp['working_days'] ?>">
+                                        data-days="<?= $emp['working_days'] ?>" data-status="<?= $emp['salary_status'] ?>">
 
                                     <?= htmlspecialchars($emp['full_name']) ?>
-                                    <?= $emp['prorate_reason'] === 'multi' ? ' (Gộp CV)' : '' ?>
-                                    <?= in_array($emp['account_id'], $has_salary) ? '✓' : '' ?>
+                                    <?= $emp['prorate_reason'] === 'pro_rated' ? ' (Tỷ lệ)' : '' ?>
+                                    <?php if ($emp['salary_status'] === 'finalized'): ?>
+                                        (ĐÃ CHỐT ✓)
+                                    <?php elseif ($emp['salary_status'] === 'draft'): ?>
+                                        (TẠM TÍNH)
+                                    <?php endif; ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
+                            <input type="hidden" id="empSalaryStatus">
                         </div>
                         <div class="mb-2">
-                            <label class="form-label">Lương cơ bản (tự động) <span id="prorateHint" class="text-info small ms-2"></span></label>
+                            <label class="form-label">Lương tính theo ngày làm thực tế <span id="prorateHint" class="text-info small ms-2"></span></label>
                             <div class="input-group">
                                 <input type="text" class="form-control bg-light" id="baseSalaryDisplay" disabled>
-                                <span class="input-group-text bg-light" id="workingDaysDisplay">0 ngày</span>
+                                <input type="text" class="form-control bg-light" id="workingDaysDisplay" disabled style="width: 140px;">
                             </div>
                             <input type="hidden" name="base_salary_val" id="baseSalaryHidden">
+                            <small class="text-muted" style="font-size: 0.75rem;">Công thức: (Lương CB / <?= $totalDaysInMonth ?> ngày) × số ngày làm (Active)</small>
                         </div>
                            <div class="mb-2">
                             <label class="form-label fw-bold">Phụ cấp (VND) <span id="allowanceFmt" class="text-muted small ms-2"></span></label>
@@ -456,11 +329,17 @@ if (isset($_GET['print'])) {
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Ghi chú</label>
-                            <input type="text" class="form-control" name="notes" placeholder="Ghi chú lương tháng này...">
+                            <input type="text" class="form-control" name="notes" id="notesInput" placeholder="Ghi chú lương tháng này...">
                         </div>
-                        <button type="submit" name="save_salary" class="btn btn-success w-100 fw-bold">
-                            <i class="fa-solid fa-floppy-disk me-1"></i>Lưu lương tháng <?= $sel_month ?>/<?= $sel_year ?>
-                        </button>
+                        <div class="mt-3" id="salaryActionContainer">
+                            <button type="submit" name="save_salary" id="btnSaveSalary" class="btn <?= $isPastMonth ? 'btn-success' : 'btn-primary' ?> fw-bold w-100 py-2">
+                                <i class="fa-solid <?= $isPastMonth ? 'fa-lock' : 'fa-save' ?> me-1"></i> 
+                                <?= $isPastMonth ? "Chốt lương tháng $sel_month/$sel_year" : "Lưu lương tạm tính tháng $sel_month/$sel_year" ?>
+                            </button>
+                            <div id="lockedNotify" class="alert alert-warning mt-2 d-none" style="font-size: 0.85rem;">
+                                <i class="fa-solid fa-shield-halved me-1"></i> Bản ghi lương này đã được <b>Chốt chính thức</b> và không thể chỉnh sửa.
+                            </div>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -550,6 +429,7 @@ if (isset($_GET['print'])) {
             <?php endif; ?>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <script>
@@ -595,7 +475,7 @@ function fillBaseSalary(sel) {
     const reason = option.dataset.prorateReason;
 
     document.getElementById('baseSalaryDisplay').value = salary.toLocaleString('vi-VN') + ' VND';
-    document.getElementById('workingDaysDisplay').textContent = workingDays + ' ngày làm';
+    document.getElementById('workingDaysDisplay').value = workingDays + ' ngày làm';
     document.getElementById('baseSalaryHidden').value = salary; 
     document.getElementById('deductInput').value = autoDeduct;
     
@@ -605,17 +485,36 @@ function fillBaseSalary(sel) {
         document.getElementById('leaveHint').textContent = '';
     }
 
-    if (reason === 'multi') {
-        document.getElementById('prorateHint').textContent = '(Tính gộp nhiều chức vụ)';
-        document.getElementById('prorateHint').className = 'text-success small ms-2';
-    } else if (reason === 'less_28') {
-        document.getElementById('prorateHint').textContent = '(Tính theo tỷ lệ < 28 ngày)';
+    if (reason === 'pro_rated') {
+        document.getElementById('prorateHint').textContent = '(Theo tỷ lệ thời gian làm)';
         document.getElementById('prorateHint').className = 'text-info small ms-2';
     } else {
-        document.getElementById('prorateHint').textContent = '';
+        document.getElementById('prorateHint').textContent = '(Làm đủ tháng)';
+        document.getElementById('prorateHint').className = 'text-success small ms-2';
     }
 
     window._baseSalary = salary;
+    
+    // Kiểm tra trạng thái đã chốt chưa
+    const status = option.dataset.status || '';
+    document.getElementById('empSalaryStatus').value = status;
+    
+    const isFinalized = (status === 'finalized');
+    const inputs = ['allowanceInput', 'bonusInput', 'deductInput', 'notesInput', 'btnSaveSalary'];
+    
+    inputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            if (id === 'btnSaveSalary') {
+                el.style.display = isFinalized ? 'none' : 'block';
+            } else {
+                el.disabled = isFinalized;
+            }
+        }
+    });
+
+    document.getElementById('lockedNotify').classList.toggle('d-none', !isFinalized);
+
     calcTotal();
 }
 

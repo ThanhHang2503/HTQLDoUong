@@ -88,11 +88,24 @@ if ($isManager) {
 $list_result = mysqli_query($conn, $list_sql);
 $resignations = $list_result ? mysqli_fetch_all($list_result, MYSQLI_ASSOC) : [];
 $status_class = ['chờ duyệt'=>'warning','chấp thuận'=>'success','từ chối'=>'danger','hủy'=>'secondary'];
+
+// Đơn chờ duyệt (cho manager)
+$pending_count = 0;
+if ($isManager) {
+    $pc = mysqli_query($conn, "SELECT COUNT(*) FROM resignation_requests WHERE status='chờ duyệt'");
+    $pending_count = $pc ? (int)mysqli_fetch_row($pc)[0] : 0;
+}
 ?>
 
 <div class="dash_board px-2">
     <h1 class="head-name">ĐƠN NGHỈ VIỆC</h1>
     <div class="head-line"></div>
+
+    <?php if ($isManager && $pending_count > 0): ?>
+        <div class="alert alert-warning fw-bold">
+            <i class="fa-solid fa-bell me-2"></i>Có <b><?= $pending_count ?></b> đơn nghỉ việc đang chờ duyệt!
+        </div>
+    <?php endif; ?>
 
     <?php if ($msg_success): ?>
         <div class="alert alert-success"><?= htmlspecialchars($msg_success) ?></div>

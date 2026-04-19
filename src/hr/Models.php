@@ -98,6 +98,7 @@ class SalaryRecord {
     public int $deductions;
     public int $total_salary;
     public ?string $notes;
+    public string $status; // 'draft' hoặc 'finalized'
     public string $created_at;
     public string $updated_at;
 
@@ -113,6 +114,7 @@ class SalaryRecord {
         $this->deductions = (int)($data['deductions'] ?? 0);
         $this->total_salary = (int)($data['total_salary'] ?? 0);
         $this->notes = $data['notes'] ?? null;
+        $this->status = $data['status'] ?? 'draft';
         $this->created_at = $data['created_at'] ?? date('Y-m-d H:i:s');
         $this->updated_at = $data['updated_at'] ?? date('Y-m-d H:i:s');
     }
@@ -134,6 +136,7 @@ class SalaryRecord {
             'deductions' => $this->deductions,
             'total_salary' => $this->total_salary,
             'notes' => $this->notes,
+            'status' => $this->status,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

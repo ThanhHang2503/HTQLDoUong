@@ -69,12 +69,12 @@ requirePermission(AppPermission::MANAGE_ACCOUNTS);
 
                         <div class="row g-2">
                             <div class="col-md-6 mb-2">
-                                <label class="form-label fw-bold">Số điện thoại</label>
-                                <input type="text" class="form-control" id="ac_phone" placeholder="090..." inputmode="numeric" pattern="[0-9]{10,}">
+                                <label class="form-label fw-bold">Số điện thoại <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="ac_phone" placeholder="9-11 chữ số" inputmode="numeric" pattern="[0-9]{9,11}" title="Chỉ nhập số, độ dài 9-11 ký tự">
                             </div>
                             <div class="col-md-6 mb-2">
-                                <label class="form-label fw-bold">Ngày sinh</label>
-                                <input type="date" class="form-control" id="ac_birth_date">
+                                <label class="form-label fw-bold">Ngày sinh (Đủ 18 tuổi) <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="ac_birth_date" max="<?= (date('Y') - 18) . '-12-31' ?>">
                             </div>
                         </div>
 
@@ -474,7 +474,7 @@ function formatDate(dateStr) {
 }
 
 function isValidPhone(phone) {
-    return /^\d{10,}$/.test(phone);
+    return /^[0-9]{9,11}$/.test(phone);
 }
 
 function isValidEmail(email) {
@@ -503,10 +503,23 @@ async function saveAccount(e) {
     }
 
     if (phoneInput !== '' && !isValidPhone(phoneInput)) {
-        showResult(false, 'Thất bại', 'Số điện thoại không đúng định dạng');
+        showResult(false, 'Thất bại', 'Số điện thoại không hợp lệ (phải chỉ gồm 9-11 chữ số)');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Lưu thông tin';
         return;
+    }
+
+    const birthDateInput = document.getElementById('ac_birth_date').value;
+    if (birthDateInput !== '') {
+        const bd = new Date(birthDateInput);
+        const birthYear = bd.getFullYear();
+        const currentYear = new Date().getFullYear();
+        if (currentYear - birthYear < 18) {
+            showResult(false, 'Thất bại', 'Nhân viên phải từ 18 tuổi trở lên');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk me-1"></i> Lưu thông tin';
+            return;
+        }
     }
 
     const payload = {

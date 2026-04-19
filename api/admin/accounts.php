@@ -72,6 +72,7 @@ try {
         if ($result['success']) {
             echo json_encode(['success' => true, 'message' => 'Thêm tài khoản thành công', 'id' => $result['account_id']]);
         } else {
+            http_response_code(400); // Bad Request cho lỗi validation
             echo json_encode(['success' => false, 'message' => $result['error']]);
         }
         exit;
@@ -104,6 +105,7 @@ try {
         if ($result['success']) {
             echo json_encode(['success' => true, 'message' => 'Cập nhật tài khoản thành công']);
         } else {
+            http_response_code(400); // Bad Request cho lỗi validation
             echo json_encode(['success' => false, 'message' => $result['error']]);
         }
         exit;
@@ -156,6 +158,7 @@ try {
 
             $sql = "UPDATE accounts SET hr_status = '$status'" . ($autoLockSystem ? ", system_status = 'locked'" : "") . " WHERE account_id = $account_id";
             if (mysqli_query($conn, $sql)) {
+                $employeeService->syncStatusHistory($account_id);
                 echo json_encode(['success' => true, 'message' => 'Đã cập nhật trạng thái làm việc']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Lỗi cập nhật trạng thái làm việc']);
@@ -181,6 +184,7 @@ try {
 
             $sql = "UPDATE accounts SET system_status = '$status' WHERE account_id = $account_id";
             if (mysqli_query($conn, $sql)) {
+                $employeeService->syncStatusHistory($account_id);
                 echo json_encode(['success' => true, 'message' => 'Đã cập nhật trạng thái truy cập hệ thống']);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Lỗi cập nhật trạng thái hệ thống']);

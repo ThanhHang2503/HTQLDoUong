@@ -68,13 +68,16 @@ if (isset($_GET['home'])) {
     $currentTitle = 'Thống kê';
 }
 
-// Đếm đơn chờ duyệt (cho manager/admin)
-$pending_count = 0;
-if ($isManagerOrAdmin) {
+// Đếm đơn chờ duyệt (chỉ cho Quản lý nhân sự để hiển thị Badge)
+$pending_leave_count = 0;
+$pending_resignation_count = 0;
+if ($isManagerRole) {
     global $conn;
     $pc = mysqli_query($conn, "SELECT COUNT(*) FROM leave_requests WHERE status='chờ duyệt'");
+    $pending_leave_count = $pc ? (int)mysqli_fetch_row($pc)[0] : 0;
+    
     $pr = mysqli_query($conn, "SELECT COUNT(*) FROM resignation_requests WHERE status='chờ duyệt'");
-    $pending_count = ($pc ? (int)mysqli_fetch_row($pc)[0] : 0) + ($pr ? (int)mysqli_fetch_row($pr)[0] : 0);
+    $pending_resignation_count = $pr ? (int)mysqli_fetch_row($pr)[0] : 0;
 }
 ?>
 
@@ -169,11 +172,11 @@ if ($isManagerOrAdmin) {
             <?php endif; ?>
         </div>
 
-        <!-- ===== QUẢN LÝ (Manager/Admin) ===== -->
+        <!-- ===== QUẢN LÝ NHÂN SỰ (Manager) ===== -->
         <?php if ($isManagerRole) : ?>
             <hr>
             <div class="container-fluid admin-head">
-                <h5 class="text-center py-2 fw-bold">Quản Lý</h5>
+                <h5 class="text-center py-2 fw-bold">Quản lý nhân sự</h5>
             </div>
             <div class="navs text-center p-0">
                 <!-- Khu vực dành riêng cho Manager (HR) -->
@@ -189,28 +192,33 @@ if ($isManagerOrAdmin) {
                     <a class="text-truncate <?= isset($_GET['donnghi']) ? 'active' : '' ?>"
                        href="user_page.php?donnghi">
                         <i class="fa-solid fa-calendar-check"></i> Đơn nghỉ phép
-                        <?php if ($pending_count > 0): ?>
-                        <span class="badge text-bg-danger"><?= $pending_count ?></span>
+                        <?php if ($pending_leave_count > 0): ?>
+                        <span class="badge text-bg-danger"><?= $pending_leave_count ?></span>
                         <?php endif; ?>
                     </a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['donnghiviec']) ? 'active' : '' ?>"
-                       href="user_page.php?donnghiviec"><i class="fa-solid fa-door-open"></i> Đơn nghỉ việc</a>
+                       href="user_page.php?donnghiviec">
+                        <i class="fa-solid fa-door-open"></i> Đơn nghỉ việc
+                        <?php if ($pending_resignation_count > 0): ?>
+                        <span class="badge text-bg-danger"><?= $pending_resignation_count ?></span>
+                        <?php endif; ?>
+                    </a>
                 </div>
             </div>
         <?php endif; ?>
 
         <!-- ===== NHÂN VIÊN: menu cá nhân ===== -->
-        <?php if (!$isAdminRole): ?>
+        <?php if (!$isManagerRole): ?>
         <hr class="mt-2">
         <div class="navs text-center p-0">
             <div class="container-fluid">
-                <a class="text-truncate <?= isset($_GET['donnghi']) && !$isManagerOrAdmin ? 'active' : '' ?>"
+                <a class="text-truncate <?= isset($_GET['donnghi']) ? 'active' : '' ?>"
                    href="user_page.php?donnghi"><i class="fa-solid fa-calendar-minus"></i> Đơn nghỉ phép</a>
             </div>
             <div class="container-fluid">
-                <a class="text-truncate <?= isset($_GET['donnghiviec']) && !$isManagerOrAdmin ? 'active' : '' ?>"
+                <a class="text-truncate <?= isset($_GET['donnghiviec']) ? 'active' : '' ?>"
                    href="user_page.php?donnghiviec"><i class="fa-solid fa-door-open"></i> Đơn nghỉ việc</a>
             </div>
             <div class="container-fluid">

@@ -113,23 +113,23 @@ if ($editSupplierId > 0) {
                             </div>
                             <div class="mb-2">
                                 <label class="form-label">Tên nhà cung cấp</label>
-                                <input class="form-control" type="text" name="supplier_name" value="<?= htmlspecialchars($editSupplier['supplier_name']) ?>" required>
+                                <input class="form-control" type="text" name="supplier_name" value="<?= htmlspecialchars($editSupplier['supplier_name']) ?>" required placeholder="Nhập tên nhà cung cấp">
                             </div>
                             <div class="mb-2">
                                 <label class="form-label">Người liên hệ</label>
-                                <input class="form-control" type="text" name="contact_name" value="<?= htmlspecialchars((string)$editSupplier['contact_name']) ?>">
+                                <input class="form-control" type="text" name="contact_name" value="<?= htmlspecialchars((string)$editSupplier['contact_name']) ?>" required placeholder="Nhập tên người liên hệ">
                             </div>
                             <div class="mb-2">
                                 <label class="form-label">Số điện thoại</label>
-                                <input class="form-control" type="text" name="phone_number" value="<?= htmlspecialchars((string)$editSupplier['phone_number']) ?>">
+                                <input class="form-control" type="text" name="phone_number" value="<?= htmlspecialchars((string)$editSupplier['phone_number']) ?>" inputmode="numeric" pattern="[0-9]{10,11}" minlength="10" maxlength="11" required title="Số điện thoại chỉ gồm 10 hoặc 11 chữ số" placeholder="Ví dụ: 090xxxxxxx">
                             </div>
                             <div class="mb-2">
                                 <label class="form-label">Email</label>
-                                <input class="form-control" type="email" name="email" value="<?= htmlspecialchars((string)$editSupplier['email']) ?>">
+                                <input class="form-control" type="email" name="email" value="<?= htmlspecialchars((string)$editSupplier['email']) ?>" required placeholder="Ví dụ: ncc@example.com">
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Địa chỉ</label>
-                                <textarea class="form-control" name="address" rows="2"><?= htmlspecialchars((string)$editSupplier['address']) ?></textarea>
+                                <textarea class="form-control" name="address" rows="2" required placeholder="Nhập địa chỉ nhà cung cấp"><?= htmlspecialchars((string)$editSupplier['address']) ?></textarea>
                             </div>
 
                             <button class="btn btn-warning" type="submit">Cập nhật nhà cung cấp</button>

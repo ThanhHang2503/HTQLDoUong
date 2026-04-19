@@ -23,6 +23,61 @@ class EmployeeService {
     }
 
     /**
+     * Quy tắc ánh xạ Trạng thái tổng hợp (Mapping Logic)
+     * Chỉ dựa vào hr_status, không xét đến system_status cho việc tính lương.
+     */
+    private function mapStatus($hr_status): string {
+        if ($hr_status === 'resigned') return 'resigned';
+        if ($hr_status === 'on_leave') return 'on_leave';
+        return 'active';
+    }
+
+    /**
+     * Đồng bộ hóa Trạng thái vào bảng lịch sử (employee_status_history)
+     * Đảm bảo không có overlap và là nguồn duy nhất để tính lương.
+     */
+    public function syncStatusHistory(int $account_id, string $change_date = null): void {
+        $aid = (int)$account_id;
+        if (!$change_date) $change_date = date('Y-m-d');
+
+        // Lấy thông tin hiện tại từ bảng accounts
+        $acc_q = mysqli_query($this->conn, "SELECT hr_status FROM accounts WHERE account_id = $aid");
+        $acc = mysqli_fetch_assoc($acc_q);
+        if (!$acc) return;
+
+        $new_status = $this->mapStatus($acc['hr_status']);
+
+        // Lấy bản ghi lịch sử cuối cùng
+        $q = mysqli_query($this->conn, "SELECT history_id, status, start_date, end_date 
+                                       FROM employee_status_history 
+                                       WHERE account_id = $aid 
+                                       ORDER BY start_date DESC, history_id DESC LIMIT 1");
+        $last = mysqli_fetch_assoc($q);
+
+        if ($last) {
+            // Nếu trạng thái giống hệt bản ghi cuối -> Không cần làm gì
+            if ($last['status'] === $new_status) return;
+
+            $last_id = (int)$last['history_id'];
+            $last_start = $last['start_date'];
+
+            // Nếu thay đổi xảy ra chính vào ngày bắt đầu của bản ghi cũ -> Chỉ cần UPDATE trạng thái đó
+            if ($last_start === $change_date) {
+                mysqli_query($this->conn, "UPDATE employee_status_history SET status = '$new_status' WHERE history_id = $last_id");
+                return;
+            }
+
+            // Đóng bản ghi cũ: end_date = chính ngày thay đổi
+            // (Cho phép overlap để ngày đó vẫn tính là công nếu có trạng thái active)
+            mysqli_query($this->conn, "UPDATE employee_status_history SET end_date = '$change_date' WHERE history_id = $last_id");
+        }
+
+        // Tạo bản ghi trạng thái mới
+        mysqli_query($this->conn, "INSERT INTO employee_status_history (account_id, status, start_date, end_date) 
+                                   VALUES ($aid, '$new_status', '$change_date', NULL)");
+    }
+
+    /**
      * Lấy thông tin nhân viên
      */
     public function getEmployee(int $account_id): ?array {
@@ -97,13 +152,21 @@ class EmployeeService {
         $address = trim(mysqli_real_escape_string($this->conn, $data['address'] ?? ''));
         $gender = in_array($data['gender'] ?? '', ['nam', 'nữ', 'khác']) ? $data['gender'] : 'nam';
 
-        // Validate số điện thoại: chỉ số, tối thiểu 10 chữ số
-        if ($phone !== '' && !preg_match('/^\d{10,}$/', $phone)) {
-            return ['success' => false, 'error' => 'Số điện thoại không đúng định dạng'];
+        // Validate số điện thoại: Chỉ cho phép ký tự số, độ dài 9-11 số
+        if ($phone !== '' && !preg_match('/^[0-9]{9,11}$/', $phone)) {
+            return ['success' => false, 'error' => 'Số điện thoại không hợp lệ (phải chỉ gồm 9-11 chữ số)'];
         }
         
-        // Chuẩn hóa ngày sinh
-        $birth_date = !empty($data['birth_date']) ? "'" . mysqli_real_escape_string($this->conn, $data['birth_date']) . "'" : "NULL";
+        // Chuẩn hóa và Validate ngày sinh (Birth Date)
+        $birth_date_raw = trim((string)($data['birth_date'] ?? ''));
+        if ($birth_date_raw !== '') {
+            $birthYear = (int)date('Y', strtotime($birth_date_raw));
+            $currentYear = (int)date('Y');
+            if ($currentYear - $birthYear < 18) {
+                return ['success' => false, 'error' => 'Nhân viên phải từ 18 tuổi trở lên (tính theo năm sinh)'];
+            }
+        }
+        $birth_date = $birth_date_raw !== '' ? "'" . mysqli_real_escape_string($this->conn, $birth_date_raw) . "'" : "NULL";
         
         // Chuẩn hóa ngày vào làm (Backend handles default)
         $hire_date_val = !empty($data['hire_date']) ? $data['hire_date'] : date('Y-m-d');
@@ -139,6 +202,9 @@ class EmployeeService {
             ]);
             $this->posHistRepo->create($hist);
             
+            // 8. Khởi tạo lịch sử trạng thái đầu tiên (Dựa trên hire_date)
+            $this->syncStatusHistory($account_id, $hire_date_val);
+
             return ['success' => true, 'account_id' => $account_id];
         }
         
@@ -185,11 +251,26 @@ class EmployeeService {
 
         if (isset($data['phone'])) {
             $phoneRaw = trim((string)$data['phone']);
-            if ($phoneRaw !== '' && !preg_match('/^\d{10,}$/', $phoneRaw)) {
-                return ['success' => false, 'error' => 'Số điện thoại không đúng định dạng'];
+            // Validate số điện thoại: Chỉ cho phép ký tự số, độ dài 9-11 số
+            if ($phoneRaw !== '' && !preg_match('/^[0-9]{9,11}$/', $phoneRaw)) {
+                return ['success' => false, 'error' => 'Số điện thoại không hợp lệ (phải chỉ gồm 9-11 chữ số)'];
             }
             $val = mysqli_real_escape_string($this->conn, $phoneRaw);
             $updates[] = "phone = '$val'";
+        }
+
+        if (isset($data['birth_date'])) {
+            $birth_date_raw = trim((string)$data['birth_date']);
+            if ($birth_date_raw !== '') {
+                $birthYear = (int)date('Y', strtotime($birth_date_raw));
+                $currentYear = (int)date('Y');
+                if ($currentYear - $birthYear < 18) {
+                    return ['success' => false, 'error' => 'Nhân viên phải từ 18 tuổi trở lên (tính theo năm sinh)'];
+                }
+                $updates[] = "birth_date = '" . mysqli_real_escape_string($this->conn, $birth_date_raw) . "'";
+            } else {
+                $updates[] = "birth_date = NULL";
+            }
         }
 
         if (isset($data['address'])) {
@@ -200,11 +281,6 @@ class EmployeeService {
         if (isset($data['gender'])) {
             $val = in_array($data['gender'], ['nam', 'nữ', 'khác']) ? $data['gender'] : 'nam';
             $updates[] = "gender = '$val'";
-        }
-
-        if (isset($data['birth_date'])) {
-            $val = !empty($data['birth_date']) ? "'" . mysqli_real_escape_string($this->conn, $data['birth_date']) . "'" : "NULL";
-            $updates[] = "birth_date = $val";
         }
 
         if (isset($data['hire_date'])) {
@@ -238,6 +314,10 @@ class EmployeeService {
         $query = "UPDATE accounts SET " . implode(', ', $updates) . " WHERE account_id = $aid";
         
         if (mysqli_query($this->conn, $query)) {
+            // Đồng bộ lịch sử trạng thái nếu có thay đổi liên quan
+            if (isset($data['hr_status']) || isset($data['system_status'])) {
+                $this->syncStatusHistory($aid);
+            }
             return ['success' => true];
         }
         
@@ -441,6 +521,53 @@ class EmployeeService {
         $pos = $this->posRepo->getById($hist->position_id);
         return $pos ? $pos->toArray() : null;
     }
+
+    /**
+     * Tính số ngày làm việc active trong tháng
+     * Quy tắc: Nếu ngày đó có bất kỳ trạng thái 'active' nào thì tính là 1 ngày công.
+     */
+    public function getActiveWorkingDaysCount(int $account_id, int $month, int $year): int {
+        $aid = (int)$account_id;
+        $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
+        $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
+        $totalDaysInMonth = (int)date('t', strtotime($startOfMonth));
+
+        $sql = "SELECT status, start_date, end_date 
+                FROM employee_status_history 
+                WHERE account_id = $aid 
+                AND start_date <= '$endOfMonth' 
+                AND (end_date IS NULL OR end_date >= '$startOfMonth')";
+        $res = mysqli_query($this->conn, $sql);
+        $history = mysqli_fetch_all($res, MYSQLI_ASSOC);
+
+        $activeDays = 0;
+        $todayTs = strtotime(date('Y-m-d'));
+
+        for ($d = 1; $d <= $totalDaysInMonth; $d++) {
+            $dateStr = sprintf("%04d-%02d-%02d", $year, $month, $d);
+            $ts = strtotime($dateStr);
+            
+            // Không tính ngày trong tương lai
+            if ($ts > $todayTs) continue;
+
+            $isActive = false;
+            foreach ($history as $h) {
+                $sTs = strtotime($h['start_date']);
+                $eTs = $h['end_date'] ? strtotime($h['end_date']) : strtotime('2099-12-31');
+                
+                if ($ts >= $sTs && $ts <= $eTs && $h['status'] === 'active') {
+                    $isActive = true;
+                    break;
+                }
+            }
+
+            if ($isActive) {
+                $activeDays++;
+            }
+        }
+
+        return $activeDays;
+    }
 }
 
 /**
@@ -459,79 +586,98 @@ class SalaryService {
 
     /**
      * Tính lương cho nhân viên
-     * Formula: base_salary + allowance + bonus - deductions
+     * Formula: (effective_days / 30) * base_salary + allowance + bonus - deductions
      */
     public function calculateSalary(int $account_id, int $month, int $year, 
                                     int $allowance = 0, int $bonus = 0, int $deductions = 0): array {
-        // Get employee info (including hire/resignation dates)
         $aid = (int)$account_id;
-        $query = "SELECT a.position_id, a.hire_date, a.resignation_date 
-                  FROM accounts a 
-                  WHERE a.account_id = $aid";
-        $result = mysqli_query($this->conn, $query);
-        $row = mysqli_fetch_assoc($result);
         
-        if (!$row) {
-            return ['success' => false, 'error' => 'Không tìm thấy nhân viên'];
-        }
-        
-        $position_id = (int)$row['position_id'];
+        // 1. Lấy thông tin nhân viên & chức vụ
+        $empService = new EmployeeService($this->conn);
+        $employee = $empService->getEmployee($aid);
+        if (!$employee) return ['success' => false, 'error' => 'Không tìm thấy nhân viên'];
+
+        $position_id = (int)$employee['position_id'];
         $position = $this->posRepo->getById($position_id);
-        
-        if (!$position) {
-            return ['success' => false, 'error' => 'Không tìm thấy chức vụ'];
-        }
+        if (!$position) return ['success' => false, 'error' => 'Không tìm thấy chức vụ'];
 
         $base_salary = $position->base_salary;
-        $days_in_month = (int)date('t', strtotime("$year-$month-01"));
-        $effective_days = 30; // Standard month logic as requested
 
-        // 1. Check Resignation Pro-rating
-        if ($row['resignation_date']) {
-            $res_date = $row['resignation_date'];
-            $res_month = (int)date('m', strtotime($res_date));
-            $res_year = (int)date('Y', strtotime($res_date));
-            
-            if ($res_year < $year || ($res_year == $year && $res_month < $month)) {
-                // Already resigned in past month
-                $effective_days = 0;
-            } elseif ($res_year == $year && $res_month == $month) {
-                // Resignation month
-                $res_day = (int)date('d', strtotime($res_date));
-                $effective_days = $res_day - 1; // Worked until day before resignation
-                if ($effective_days < 0) $effective_days = 0;
-            }
-        }
-
-        // 2. Check Hire Date Pro-rating (if not already resigned/0 days)
-        if ($effective_days > 0 && $row['hire_date']) {
-            $h_date = $row['hire_date'];
-            $h_month = (int)date('m', strtotime($h_date));
-            $h_year = (int)date('Y', strtotime($h_date));
-            
-            if ($h_year == $year && $h_month == $month) {
-                // Hire month pro-rating
-                $h_day = (int)date('d', strtotime($h_date));
-                $worked_from_hire = 31 - $h_day; // e.g. hired on 30th -> 1 day, hired on 1st -> 30 days
-                if ($worked_from_hire < $effective_days) {
-                    $effective_days = $worked_from_hire;
-                }
-            } elseif ($h_year > $year || ($h_year == $year && $h_month > $month)) {
-                // Not yet hired
-                $effective_days = 0;
-            }
-        }
-
-        // Cap effective days at 30
-        if ($effective_days > 30) $effective_days = 30;
+        // 2. Lấy dữ liệu lịch sử trạng thái và lịch sử chức vụ (Dùng cho tính lương theo thời gian)
+        $startOfMonth = sprintf("%04d-%02d-01", $year, $month);
+        $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
         
-        $pro_rated_base = round(($effective_days / 30) * $base_salary);
+        // A. Lịch sử trạng thái
+        $status_sql = "SELECT status, start_date, end_date FROM employee_status_history 
+                       WHERE account_id = $aid AND start_date <= '$endOfMonth' 
+                       AND (end_date IS NULL OR end_date >= '$startOfMonth')";
+        $st_res = mysqli_query($this->conn, $status_sql);
+        $statusHistory = mysqli_fetch_all($st_res, MYSQLI_ASSOC);
+
+        // B. Lịch sử chức vụ (Lấy base_salary tương ứng từng mốc)
+        $pos_sql = "SELECT eph.start_date, eph.end_date, p.base_salary 
+                    FROM employee_positions_history eph
+                    JOIN positions p ON p.position_id = eph.position_id
+                    WHERE eph.account_id = $aid AND eph.start_date <= '$endOfMonth'
+                    AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')";
+        $ps_res = mysqli_query($this->conn, $pos_sql);
+        $posHistory = mysqli_fetch_all($ps_res, MYSQLI_ASSOC);
+
+        $days_in_month = (int)date('t', strtotime($startOfMonth));
+        $actual_active_days = 0;
+        $total_pro_rated_base = 0;
+        $todayTs = strtotime(date('Y-m-d'));
+
+        // 3. Duyệt từng ngày để tính lương gộp (Dựa trên lịch sử)
+        for ($d = 1; $d <= $days_in_month; $d++) {
+            $dateStr = sprintf("%04d-%02d-%02d", $year, $month, $d);
+            $ts = strtotime($dateStr);
+            if ($ts > $todayTs) continue;
+
+            // Kiểm tra Active (Ưu tiên: chỉ cần ANY record là active)
+            $isActive = false;
+            foreach ($statusHistory as $sh) {
+                $sTs = strtotime($sh['start_date']);
+                $eTs = $sh['end_date'] ? strtotime($sh['end_date']) : strtotime('2099-12-31');
+                if ($ts >= $sTs && $ts <= $eTs && $sh['status'] === 'active') {
+                    $isActive = true;
+                    break;
+                }
+            }
+
+            if ($isActive) {
+                $actual_active_days++;
+                
+                // Tìm lương cơ bản của chức vụ tại ngày này
+                $day_salary = $base_salary; // Default fallback
+                foreach ($posHistory as $ph) {
+                    $sTs = strtotime($ph['start_date']);
+                    $eTs = $ph['end_date'] ? strtotime($ph['end_date']) : strtotime('2099-12-31');
+                    if ($ts >= $sTs && $ts <= $eTs) {
+                        $day_salary = (int)$ph['base_salary'];
+                        break;
+                    }
+                }
+                $total_pro_rated_base += ($day_salary / $days_in_month);
+            }
+        }
+
+        // 4. Chuẩn hóa sang hệ số 30 ngày cho Effective Days (Hiển thị)
+        if ($actual_active_days >= $days_in_month) {
+            $effective_days = 30.0;
+        } else {
+            $effective_days = ($actual_active_days / $days_in_month) * 30.0;
+        }
+        
+        $effective_days = round($effective_days, 1);
+        $pro_rated_base = (int)round($total_pro_rated_base);
         $total = $pro_rated_base + $allowance + $bonus - $deductions;
         
         return [
             'success' => true,
             'position_id' => $position_id,
             'base_salary' => $base_salary,
+            'actual_active_days' => $actual_active_days,
             'effective_days' => $effective_days,
             'pro_rated_base' => $pro_rated_base,
             'allowance' => $allowance,
@@ -545,10 +691,22 @@ class SalaryService {
      * Lưu bản ghi lương
      */
     public function saveSalary(int $account_id, int $month, int $year, array $data): array {
-        // Check if already exists
+        // 1. Xác định trạng thái tự động dựa trên thời điểm
+        $currentMonth = (int)date('n');
+        $currentYear = (int)date('Y');
+        
+        $isPastMonth = ($year < $currentYear) || ($year == $currentYear && $month < $currentMonth);
+        $newStatus = $isPastMonth ? 'finalized' : 'draft';
+
+        // 2. Kiểm tra bản ghi hiện tại
         $existing = $this->salaryRepo->getByAccountAndMonth($account_id, $month, $year);
         
         if ($existing) {
+            // Chặn chỉnh sửa nếu đã chốt (Finalized)
+            if ($existing->status === 'finalized') {
+                return ['success' => false, 'error' => 'Lương tháng này đã được chốt chính thức, không thể chỉnh sửa.'];
+            }
+
             // Update
             $existing->allowance = (int)$data['allowance'];
             $existing->bonus = (int)$data['bonus'];
@@ -556,9 +714,11 @@ class SalaryService {
             $existing->total_salary = $existing->base_salary + $existing->allowance + 
                                      $existing->bonus - $existing->deductions;
             $existing->notes = $data['notes'] ?? null;
+            $existing->status = $newStatus; // Chuyển sang finalized nếu tháng đã kết thúc
             
             if ($this->salaryRepo->update($existing)) {
-                return ['success' => true, 'message' => 'Cập nhật bản ghi lương thành công'];
+                $msg = ($newStatus === 'finalized') ? 'Chốt lương chính thức thành công' : 'Cập nhật lương tạm tính thành công';
+                return ['success' => true, 'message' => $msg];
             }
         } else {
             // Create
@@ -582,10 +742,12 @@ class SalaryService {
                 'deductions' => $calc['deductions'],
                 'total_salary' => $calc['total_salary'],
                 'notes' => $data['notes'] ?? null,
+                'status' => $newStatus
             ]);
             
             if ($this->salaryRepo->create($record)) {
-                return ['success' => true, 'message' => 'Lưu bản ghi lương thành công'];
+                $msg = ($newStatus === 'finalized') ? 'Chốt lương chính thức thành công' : 'Lưu lương tạm tính thành công';
+                return ['success' => true, 'message' => $msg];
             }
         }
         
@@ -786,6 +948,10 @@ class ResignationService {
                    resignation_date = '$effective_date'
                    WHERE account_id = $aid";
             if (!mysqli_query($this->conn, $u2)) throw new \Exception("Lỗi cập nhật trạng thái nhân viên.");
+
+            // 4. Đồng bộ lịch sử trạng thái (Đóng mốc cũ, mở mốc 'resigned')
+            $empService = new EmployeeService($this->conn);
+            $empService->syncStatusHistory($aid, $effective_date);
 
             mysqli_commit($this->conn);
             return ['success' => true, 'message' => 'Đã duyệt nghỉ việc và khóa tài khoản thành công'];

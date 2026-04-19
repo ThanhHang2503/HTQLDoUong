@@ -53,6 +53,22 @@ if (isset($_GET['chucvu_history_api'])) {
            JOIN positions p ON p.position_id = eph.position_id
            WHERE eph.account_id = $acc_id ORDER BY eph.start_date DESC");
        $hist = $hr ? mysqli_fetch_all($hr, MYSQLI_ASSOC) : [];
+
+       // Nếu chưa có lịch sử (nhân viên cũ hoặc chưa đổi chức vụ), tạo bản ghi từ hire_date
+       if (empty($hist)) {
+           $sql = "SELECT a.hire_date, p.position_name FROM accounts a 
+                   JOIN positions p ON p.position_id = a.position_id 
+                   WHERE a.account_id = $acc_id";
+           $qr = mysqli_query($conn, $sql);
+           if ($qr && $row = mysqli_fetch_assoc($qr)) {
+               $hist[] = [
+                   'start_date' => $row['hire_date'] ?? '2000-01-01',
+                   'end_date' => null,
+                   'position_name' => $row['position_name'],
+                   'reason' => 'Bổ nhiệm khi vào làm'
+               ];
+           }
+       }
    } else { $hist = []; }
    header('Content-Type: application/json; charset=utf-8');
    echo json_encode($hist);
@@ -158,7 +174,7 @@ if (isset($_GET['luong_ca_nhan']) && isset($_GET['print'])) {
 // (tránh lỗi "headers already sent")
 // =====================================================================
 
-if (empty($_GET)) {
+if (empty($_GET) && empty($_POST)) {
    header('location:user_page.php?home');
    exit;
 }
@@ -168,72 +184,6 @@ if (isset($_GET['dashboard'])) {
    exit;
 }
 
-// Thêm khách hàng
-if (isset($_POST['add_customer_submit'])) {
-   requirePermission(AppPermission::MANAGE_CUSTOMERS);
-   $customer_name = mysqli_real_escape_string($conn, trim($_POST['customer_name'] ?? ''));
-   $phone_number = mysqli_real_escape_string($conn, trim($_POST['phone_number'] ?? ''));
-   $email = mysqli_real_escape_string($conn, trim($_POST['email'] ?? ''));
-   $address = mysqli_real_escape_string($conn, trim($_POST['address'] ?? ''));
-
-   if ($phone_number === '') {
-      setNotify('error', 'Số điện thoại không được để trống.');
-   } else {
-      $dup = mysqli_query($conn, "SELECT customer_id FROM customers WHERE phone_number = '$phone_number' LIMIT 1");
-      if ($dup && mysqli_num_rows($dup) > 0) {
-         setNotify('error', 'Khách hàng đã tồn tại');
-      } else {
-         $sql = "INSERT INTO customers (customer_name, phone_number, email, address) 
-               VALUES ('$customer_name', '$phone_number', '$email', '$address')";
-           
-         if (mysqli_query($conn, $sql)) {
-            setNotify('success', 'Bạn đã thêm 1 khách hàng thành công');
-         } else {
-            if (mysqli_errno($conn) == 1062) {
-               setNotify('error', 'Khách hàng đã tồn tại');
-            } else {
-               setNotify('error', 'Lỗi hệ thống khi thêm khách hàng.');
-            }
-         }
-      }
-   }
-   header("location:user_page.php?khachhang");
-   exit;
-}
-
-// Sửa khách hàng
-if (isset($_POST['update_customer_submit'])) {
-   requirePermission(AppPermission::MANAGE_CUSTOMERS);
-   $customer_id = (int)$_POST['customer_id'];
-   $customer_name = mysqli_real_escape_string($conn, trim($_POST['customer_name'] ?? ''));
-   $phone_number = mysqli_real_escape_string($conn, trim($_POST['phone_number'] ?? ''));
-   $email = mysqli_real_escape_string($conn, trim($_POST['email'] ?? ''));
-   $address = mysqli_real_escape_string($conn, trim($_POST['address'] ?? ''));
-
-   // Kiểm tra trùng số điện thoại ngoại trừ bản thân
-   $check = mysqli_query($conn, "SELECT 1 FROM customers WHERE phone_number = '$phone_number' AND customer_id != $customer_id LIMIT 1");
-   if ($check && mysqli_num_rows($check) > 0) {
-      setNotify('error', 'Khách hàng đã tồn tại', 'Lỗi trùng lặp');
-   } else {
-       $sql = "UPDATE customers SET 
-               customer_name = '$customer_name', 
-               phone_number = '$phone_number', 
-               email = '$email', 
-               address = '$address' 
-               WHERE customer_id = $customer_id";
-       if (mysqli_query($conn, $sql)) {
-           setNotify('success', 'Cập nhật thông tin khách hàng thành công.', 'Hoàn thành');
-       } else {
-         if (mysqli_errno($conn) == 1062) {
-            setNotify('error', 'Khách hàng đã tồn tại', 'Lỗi trùng lặp');
-         } else {
-            setNotify('error', 'Lỗi hệ thống khi cập nhật khách hàng.', 'Lỗi');
-         }
-       }
-   }
-   header("location:user_page.php?khachhang=sua&id=$customer_id");
-   exit;
-}
 
 //Phần loại
 //Thêm loai
@@ -248,11 +198,21 @@ if (!isset($_POST['category_id']) && isset($_POST['category_name'])) {
 //Sửa loại
 if (isset($_POST['category_id']) && isset($_POST['category_name'])) {
    requirePermission(AppPermission::MANAGE_CATALOG);
-   $category_id = $_POST['category_id'];
-   $category_name = $_POST['category_name'];
-   $update = "UPDATE category SET category_name = '$category_name' WHERE category_id = '$category_id'";
-   mysqli_query($conn, $update);
-   header('location:user_page.php?loai');
+   $category_id = (int)$_POST['category_id'];
+   $category_name = mysqli_real_escape_string($conn, trim($_POST['category_name']));
+   
+   if ($category_name === '') {
+       setNotify('error', 'Tên loại không được để trống.');
+       header("location:user_page.php?loai=sua&id=$category_id");
+   } else {
+       $update = "UPDATE category SET category_name = '$category_name' WHERE category_id = $category_id";
+       if (mysqli_query($conn, $update)) {
+           setNotify('success', 'Cập nhật loại sản phẩm thành công.');
+       } else {
+           setNotify('error', 'Lỗi hệ thống khi cập nhật loại.');
+       }
+       header("location:user_page.php?loai=sua&id=$category_id");
+   }
    exit;
 }
 //Hết phần loại
@@ -485,20 +445,40 @@ if (isset($_POST['supplier_update_submit'])) {
    $email = trim((string)($_POST['email'] ?? ''));
    $address = trim((string)($_POST['address'] ?? ''));
 
-   if ($supplier_id <= 0 || $supplier_name === '') {
-      $_SESSION['supplier_error'] = 'Dữ liệu cập nhật nhà cung cấp không hợp lệ.';
+   if ($supplier_id <= 0) {
+      $_SESSION['supplier_error'] = 'Nhà cung cấp không hợp lệ.';
       header('location:user_page.php?nhacungcap');
       exit;
    }
 
-   if ($phone_number !== '') {
-      $safe_phone_check = mysqli_real_escape_string($conn, $phone_number);
-      $dup = mysqli_query($conn, "SELECT supplier_id FROM suppliers WHERE phone_number = '{$safe_phone_check}' AND supplier_id != {$supplier_id} LIMIT 1");
-      if ($dup && mysqli_num_rows($dup) > 0) {
-         $_SESSION['supplier_error'] = 'Nhà cung cấp đã tồn tại';
-         header('location:user_page.php?nhacungcap&edit_supplier_id=' . $supplier_id);
-         exit;
-      }
+   // 1. Kiểm tra không được để trống trường nào
+   if ($supplier_name === '' || $contact_name === '' || $phone_number === '' || $email === '' || $address === '') {
+      $_SESSION['supplier_error'] = 'Vui lòng nhập đầy đủ thông tin nhà cung cấp.';
+      header('location:user_page.php?nhacungcap&edit_supplier_id=' . $supplier_id);
+      exit;
+   }
+
+   // 2. Kiểm tra định dạng số điện thoại
+   if (!preg_match('/^\d{10,11}$/', $phone_number)) {
+      $_SESSION['supplier_error'] = 'Số điện thoại không đúng định dạng (phải là 10-11 chữ số).';
+      header('location:user_page.php?nhacungcap&edit_supplier_id=' . $supplier_id);
+      exit;
+   }
+
+   // 3. Kiểm tra định dạng email
+   if (!filter_var($email, FILTER_VALIDATE_EMAIL) || preg_match('/\s/', $email)) {
+      $_SESSION['supplier_error'] = 'Email không đúng định dạng.';
+      header('location:user_page.php?nhacungcap&edit_supplier_id=' . $supplier_id);
+      exit;
+   }
+
+   // 4. Kiểm tra trùng số điện thoại (Unique)
+   $safe_phone_check = mysqli_real_escape_string($conn, $phone_number);
+   $dup = mysqli_query($conn, "SELECT supplier_id FROM suppliers WHERE phone_number = '{$safe_phone_check}' AND supplier_id != {$supplier_id} LIMIT 1");
+   if ($dup && mysqli_num_rows($dup) > 0) {
+      $_SESSION['supplier_error'] = 'Số điện thoại này đã được sử dụng bởi nhà cung cấp khác.';
+      header('location:user_page.php?nhacungcap&edit_supplier_id=' . $supplier_id);
+      exit;
    }
 
    $safe_name = mysqli_real_escape_string($conn, $supplier_name);
@@ -520,9 +500,9 @@ if (isset($_POST['supplier_update_submit'])) {
       $_SESSION['supplier_success'] = 'Cập nhật nhà cung cấp thành công.';
    } catch (\Throwable $e) {
       if ((int)mysqli_errno($conn) === 1062) {
-         $_SESSION['supplier_error'] = 'Nhà cung cấp đã tồn tại';
+         $_SESSION['supplier_error'] = 'Dữ liệu bị trùng lặp (Số điện thoại hoặc Mã NCC).';
       } else {
-         $_SESSION['supplier_error'] = 'Không thể cập nhật nhà cung cấp.';
+         $_SESSION['supplier_error'] = 'Lỗi hệ thống khi cập nhật: ' . mysqli_error($conn);
       }
    }
 

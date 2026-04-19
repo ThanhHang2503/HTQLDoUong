@@ -118,7 +118,7 @@ $status_class = ['chờ duyệt'=>'warning','chấp thuận'=>'success','từ ch
 
     <?php if ($isManager && $pending_count > 0): ?>
         <div class="alert alert-warning fw-bold">
-            <i class="fa-solid fa-bell me-2"></i>Có <b><?= $pending_count ?></b> đơn đang chờ duyệt!
+            <i class="fa-solid fa-bell me-2"></i>Có <b><?= $pending_count ?></b> đơn nghỉ phép đang chờ duyệt!
         </div>
     <?php endif; ?>
 
