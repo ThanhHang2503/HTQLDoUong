@@ -10,8 +10,8 @@ $cur_month = (int)date('n');
 $cur_year  = (int)date('Y');
 
 $where_salary = "WHERE sr.salary_year = $sel_year" . ($sel_month > 0 ? " AND sr.salary_month = $sel_month" : '');
-// Nghỉ phép luôn thống kê theo tháng hiện tại
-$where_leave  = "WHERE MONTH(lr.from_date) = $cur_month AND YEAR(lr.from_date) = $cur_year";
+// Nghỉ phép thống kê theo năm đang xem (sel_year)
+$where_leave  = "WHERE YEAR(lr.from_date) = $sel_year";
 
 // 1. Tổng quỹ lương (loại trừ admin role_id=1)
 $wage_sql = "SELECT COUNT(DISTINCT sr.account_id) AS paid_count,
@@ -59,11 +59,11 @@ $ls_r = mysqli_query($conn, $leave_stats);
 $leave_stat = ['chờ duyệt'=>0,'chấp thuận'=>0,'từ chối'=>0,'hủy'=>0];
 if ($ls_r) while ($row = mysqli_fetch_assoc($ls_r)) $leave_stat[$row['status']] = (int)$row['count'];
 
-// 4b. Tổng số ngày nghỉ trong tháng hiện tại (CHỈ TÍNH CHẤP THUẬN)
+// 4b. Tổng số ngày nghỉ trong từng tháng của năm đang xem (CHỈ TÍNH CHẤP THUẬN)
 $leave_by_month_sql = "
     SELECT MONTH(from_date) as t, SUM(DATEDIFF(to_date, from_date) + 1) as days
     FROM leave_requests 
-    WHERE MONTH(from_date) = $cur_month AND YEAR(from_date) = $cur_year AND status = 'chấp thuận'
+    WHERE YEAR(from_date) = $sel_year AND status = 'chấp thuận'
     GROUP BY MONTH(from_date)
 ";
 $lbm_r = mysqli_query($conn, $leave_by_month_sql);

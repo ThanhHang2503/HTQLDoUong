@@ -36,6 +36,8 @@ $user_name = $GLOBALS['user_name'] ?? 'Admin';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($currentTitle) ?> | ElderCoffee Admin</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="<?= $baseUrl ?>admin/assets/favicon.png">
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -303,12 +305,18 @@ $user_name = $GLOBALS['user_name'] ?? 'Admin';
             </a>
 
             <div class="admin-menu">
+                <div class="admin-menu-header"><span>Dashboard</span></div>
+                <a href="<?= $baseUrl ?>admin/index.php" class="admin-menu-item <?= (strpos($_SERVER['SCRIPT_NAME'], 'admin/index.php') !== false && empty($_GET)) ? 'active' : '' ?>">
+                    <i class="fa-solid fa-chart-line admin-menu-icon"></i>
+                    <span class="admin-menu-text">Tổng quan</span>
+                </a>
+
                 <div class="admin-menu-header"><span>Quản trị Catalog</span></div>
-                <a href="<?= $baseUrl ?>admin/index.php?view=products" class="admin-menu-item <?= (isset($_GET['view']) && $_GET['view']==='products') || (!isset($_GET['view']) && strpos($_SERVER['REQUEST_URI'], 'admin/index.php') !== false) ? 'active' : '' ?>">
+                <a href="<?= $baseUrl ?>admin/products.php" class="admin-menu-item <?= strpos($_SERVER['SCRIPT_NAME'], 'admin/products.php') !== false ? 'active' : '' ?>">
                     <i class="fa-solid fa-box admin-menu-icon"></i>
                     <span class="admin-menu-text">Sản phẩm</span>
                 </a>
-                <a href="<?= $baseUrl ?>admin/index.php?view=suppliers" class="admin-menu-item <?= isset($_GET['view']) && $_GET['view']==='suppliers' ? 'active' : '' ?>">
+                <a href="<?= $baseUrl ?>admin/suppliers.php" class="admin-menu-item <?= strpos($_SERVER['SCRIPT_NAME'], 'admin/suppliers.php') !== false ? 'active' : '' ?>">
                     <i class="fa-solid fa-truck-fast admin-menu-icon"></i>
                     <span class="admin-menu-text">Nhà cung cấp</span>
                 </a>

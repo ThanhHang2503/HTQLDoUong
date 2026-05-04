@@ -3,8 +3,7 @@ require_once __DIR__ . '/authorization.php';
 
 if (!function_exists('app_url')) {
     function app_url(string $query = ''): string {
-        $script = basename($_SERVER['SCRIPT_NAME']);
-        if ($script === 'index.php' && strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false) {
+        if (strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false) {
             return 'index.php' . ($query ? '?' . $query : '');
         }
         return 'user_page.php' . ($query ? '?' . $query : '');
