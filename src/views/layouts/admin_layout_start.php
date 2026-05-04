@@ -314,27 +314,27 @@ $user_name = $GLOBALS['user_name'] ?? 'Admin';
                 </a>
 
                 <div class="admin-menu-header"><span>Quản trị Hệ thống</span></div>
-                <a href="<?= $baseUrl ?>user_page.php?nhansu" class="admin-menu-item <?= isset($_GET['nhansu']) ? 'active' : '' ?>">
+                <a href="<?= app_url() ?>?nhansu" class="admin-menu-item <?= isset($_GET['nhansu']) ? 'active' : '' ?>">
                     <i class="fa-solid fa-users-gear admin-menu-icon"></i>
                     <span class="admin-menu-text">Người dùng (Tài khoản)</span>
                 </a>
 
                 <div class="admin-menu-header"><span>Báo Cáo - Thống Kê</span></div>
-                <a href="<?= $baseUrl ?>user_page.php?baocao_kinhdoanh" class="admin-menu-item <?= isset($_GET['baocao_kinhdoanh']) ? 'active' : '' ?>">
+                <a href="<?= app_url() ?>?baocao_kinhdoanh" class="admin-menu-item <?= isset($_GET['baocao_kinhdoanh']) ? 'active' : '' ?>">
                     <i class="fa-solid fa-chart-line admin-menu-icon"></i>
                     <span class="admin-menu-text">Báo cáo Kinh doanh</span>
                 </a>
-                <a href="<?= $baseUrl ?>user_page.php?baocao_kho" class="admin-menu-item <?= isset($_GET['baocao_kho']) ? 'active' : '' ?>">
+                <a href="<?= app_url() ?>?baocao_kho" class="admin-menu-item <?= isset($_GET['baocao_kho']) ? 'active' : '' ?>">
                     <i class="fa-solid fa-warehouse admin-menu-icon"></i>
                     <span class="admin-menu-text">Báo cáo Kho</span>
                 </a>
-                <a href="<?= $baseUrl ?>user_page.php?baocao_nhansu" class="admin-menu-item <?= isset($_GET['baocao_nhansu']) ? 'active' : '' ?>">
+                <a href="<?= app_url() ?>?baocao_nhansu" class="admin-menu-item <?= isset($_GET['baocao_nhansu']) ? 'active' : '' ?>">
                     <i class="fa-solid fa-chart-pie admin-menu-icon"></i>
                     <span class="admin-menu-text">Báo cáo Nhân sự</span>
                 </a>
 
                 <div class="admin-menu-header"><span>Cá Nhân</span></div>
-                <a href="<?= $baseUrl ?>user_page.php?profile" class="admin-menu-item <?= isset($_GET['profile']) ? 'active' : '' ?>">
+                <a href="<?= app_url() ?>?profile" class="admin-menu-item <?= isset($_GET['profile']) ? 'active' : '' ?>">
                     <i class="fa-solid fa-id-card admin-menu-icon"></i>
                     <span class="admin-menu-text">Hồ sơ cá nhân</span>
                 </a>

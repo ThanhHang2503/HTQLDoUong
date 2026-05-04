@@ -1,4 +1,5 @@
 <?php
+session_name('SESSION_ADMIN');
 session_start();
 require_once __DIR__ . '/../../config.php';
 require_once __DIR__ . '/../../src/models/functions.php';

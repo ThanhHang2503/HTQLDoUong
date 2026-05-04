@@ -81,7 +81,7 @@ $yearly_qty = ($yq_r ? mysqli_fetch_assoc($yq_r)['yearly_qty'] : 0) ?: 0;
     <!-- 3. Bộ lọc chung (Unified Filter) -->
     <div class="card shadow-sm border-0 mb-4 bg-light">
         <div class="card-body p-3">
-            <form class="row g-2 align-items-end" method="GET" action="user_page.php">
+            <form class="row g-2 align-items-end" method="GET" action="<?= app_url() ?>">
                 <input type="hidden" name="baocao_kho" value="1">
                 <div class="col-md-4">
                     <label class="form-label small fw-bold"><i class="fa-solid fa-calendar me-1 text-primary"></i> Năm báo cáo</label>
@@ -249,7 +249,7 @@ $yearly_qty = ($yq_r ? mysqli_fetch_assoc($yq_r)['yearly_qty'] : 0) ?: 0;
             </button>
         </div>
         <div class="card-body p-3 border-top">
-            <form class="row g-2 mb-3 align-items-center" method="GET" action="user_page.php">
+            <form class="row g-2 mb-3 align-items-center" method="GET" action="<?= app_url() ?>">
                 <input type="hidden" name="baocao_kho" value="1">
                 <input type="hidden" name="year" value="<?= $sel_year ?>">
                 <input type="hidden" name="month" value="<?= $sel_month ?>">
@@ -303,7 +303,7 @@ $yearly_qty = ($yq_r ? mysqli_fetch_assoc($yq_r)['yearly_qty'] : 0) ?: 0;
                     <thead class="bg-light">
                         <tr>
                             <?php 
-                            $base_url = "user_page.php?baocao_kho=1&year=$sel_year&month=$sel_month&search_item=".urlencode($kw);
+                            $base_url = app_url('baocao_kho=1&year=$sel_year&month=$sel_month&search_item=').urlencode($kw);
                             $toggle_dir = ($dir == 'ASC') ? 'DESC' : 'ASC';
                             ?>
                             <th class="ps-3"><a href="<?= $base_url ?>&sort=item_code&dir=<?= ($sort=='item_code')?$toggle_dir:'ASC' ?>" class="text-decoration-none text-secondary">Mã SP <i class="fa-solid fa-sort<?= ($sort=='item_code')?($dir=='ASC'?'-up':'-down'):'' ?> small"></i></a></th>
@@ -385,7 +385,7 @@ async function showImportDetails(itemId, itemName) {
     try {
         const year = <?= $sel_year ?>;
         const month = <?= $sel_month ?>;
-        const res = await fetch(`api/warehouse/product_import_details.php?item_id=${itemId}&year=${year}&month=${month}`);
+        const res = await fetch(`<?= getBaseUrl() ?>/api/warehouse/product_import_details.php?item_id=${itemId}&year=${year}&month=${month}`);
         const result = await res.json();
 
         if (result.success) {

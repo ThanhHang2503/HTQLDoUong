@@ -1,5 +1,8 @@
 <?php
-session_start();
+if (!defined('IS_ADMIN_ROUTER')) {
+    session_name('SESSION_USER');
+    session_start();
+}
 @include 'config.php';
 require_once __DIR__ . '/src/models/functions.php';
 require_once __DIR__ . '/src/models/authorization.php';
@@ -13,13 +16,14 @@ requireLogin();
 
 // Admin được vào admin panel. Manager/Sales/Warehouse vào user_page
 $current_role = currentRole();
-if ($current_role === AppRole::ADMIN) {
+if ($current_role === AppRole::ADMIN && !defined('IS_ADMIN_ROUTER')) {
    if (!isset($_GET['profile']) && !isset($_GET['nhansu']) && !isset($_GET['thongke'])
        && !isset($_GET['baocao_kinhdoanh']) && !isset($_GET['baocao_kho']) 
        && !isset($_GET['baocao_nhansu']) && !isset($_GET['luong_ca_nhan'])
        && !isset($_GET['chucvu']) && !isset($_GET['bangluong'])
        && !isset($_GET['dashboard'])) {
-          header('location:admin/index.php');
+          $login_url = getBaseUrl() . "/admin/index.php";
+          header('location:' . $login_url);
           exit;
    }
 }
@@ -175,12 +179,12 @@ if (isset($_GET['luong_ca_nhan']) && isset($_GET['print'])) {
 // =====================================================================
 
 if (empty($_GET) && empty($_POST)) {
-   header('location:user_page.php?home');
+   header("location:" . app_url('home'));
    exit;
 }
 
 if (isset($_GET['dashboard'])) {
-   header('location:user_page.php?home');
+   header("location:" . app_url('home'));
    exit;
 }
 
@@ -192,7 +196,7 @@ if (!isset($_POST['category_id']) && isset($_POST['category_name'])) {
    $category_name = $_POST['category_name'];
    $insert = "INSERT INTO category (category_name) values ('$category_name')";
    mysqli_query($conn, $insert);
-   header('location:user_page.php?loai');
+   header("location:" . app_url('loai'));
    exit;
 }
 //Sửa loại
@@ -203,7 +207,7 @@ if (isset($_POST['category_id']) && isset($_POST['category_name'])) {
    
    if ($category_name === '') {
        setNotify('error', 'Tên loại không được để trống.');
-       header("location:user_page.php?loai=sua&id=$category_id");
+       header("location:" . app_url('loai=sua&id=$category_id'));
    } else {
        $update = "UPDATE category SET category_name = '$category_name' WHERE category_id = $category_id";
        if (mysqli_query($conn, $update)) {
@@ -211,7 +215,7 @@ if (isset($_POST['category_id']) && isset($_POST['category_name'])) {
        } else {
            setNotify('error', 'Lỗi hệ thống khi cập nhật loại.');
        }
-       header("location:user_page.php?loai=sua&id=$category_id");
+       header("location:" . app_url('loai=sua&id=$category_id'));
    }
    exit;
 }
@@ -231,7 +235,7 @@ if (!isset($_POST['item_id']) && isset($_POST['item_name']) && isset($_POST['cat
    $upload_file = $_FILES['item_image_file'] ?? null;
    if (!$upload_file || $upload_file['error'] !== UPLOAD_ERR_OK) {
        $_SESSION['sanpham_error'] = 'Bắt buộc phải tải lên ảnh sản phẩm.';
-       header('location:user_page.php?sanpham=them');
+       header("location:" . app_url('sanpham=them'));
        exit;
    }
 
@@ -245,13 +249,13 @@ if (!isset($_POST['item_id']) && isset($_POST['item_name']) && isset($_POST['cat
 
    if (!in_array($mime, $allowed_mime)) {
        $_SESSION['sanpham_error'] = 'Ảnh không hợp lệ! Chỉ chấp nhận JPG, JPEG hoặc PNG.';
-       header('location:user_page.php?sanpham=them');
+       header("location:" . app_url('sanpham=them'));
        exit;
    }
 
    if ($item_name === '' || $description === '' || $category_id <= 0) {
       $_SESSION['sanpham_error'] = 'Vui lòng nhập đầy đủ thông tin sản phẩm hợp lệ (tên, danh mục, mô tả).';
-      header('location:user_page.php?sanpham=them');
+      header("location:" . app_url('sanpham=them'));
       exit;
    }
 
@@ -264,7 +268,7 @@ if (!isset($_POST['item_id']) && isset($_POST['item_name']) && isset($_POST['cat
    
    if (!mysqli_query($conn, $insert)) {
        $_SESSION['sanpham_error'] = 'Lỗi hệ thống khi thêm sản phẩm: ' . mysqli_error($conn);
-       header('location:user_page.php?sanpham=them');
+       header("location:" . app_url('sanpham=them'));
        exit;
    }
    
@@ -283,7 +287,7 @@ if (!isset($_POST['item_id']) && isset($_POST['item_name']) && isset($_POST['cat
       $_SESSION['sanpham_error'] = 'Thêm sản phẩm thành công nhưng không thể lưu ảnh.';
    }
 
-   header('location:user_page.php?sanpham');
+   header("location:" . app_url('sanpham'));
    exit;
 }
 
@@ -382,19 +386,19 @@ if (isset($_POST['supplier_submit'])) {
 
    if ($supplier_name === '' || $contact_name === '' || $phone_number === '' || $email === '' || $address === '') {
       $_SESSION['supplier_error'] = 'Vui lòng nhập đầy đủ thông tin nhà cung cấp.';
-      header('location:user_page.php?nhacungcap');
+      header("location:" . app_url('nhacungcap'));
       exit;
    }
 
    if (!preg_match('/^\d{10,11}$/', $phone_number)) {
       $_SESSION['supplier_error'] = 'Số điện thoại không đúng định dạng.';
-      header('location:user_page.php?nhacungcap');
+      header("location:" . app_url('nhacungcap'));
       exit;
    }
 
    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || preg_match('/\s/', $email)) {
       $_SESSION['supplier_error'] = 'Email không đúng định dạng.';
-      header('location:user_page.php?nhacungcap');
+      header("location:" . app_url('nhacungcap'));
       exit;
    }
 
@@ -403,7 +407,7 @@ if (isset($_POST['supplier_submit'])) {
       $dup = mysqli_query($conn, "SELECT supplier_id FROM suppliers WHERE phone_number = '{$safe_phone_check}' LIMIT 1");
       if ($dup && mysqli_num_rows($dup) > 0) {
          $_SESSION['supplier_error'] = 'Nhà cung cấp đã tồn tại';
-         header('location:user_page.php?nhacungcap');
+         header("location:" . app_url('nhacungcap'));
          exit;
       }
    }
@@ -430,7 +434,7 @@ if (isset($_POST['supplier_submit'])) {
       }
    }
 
-   header('location:user_page.php?nhacungcap');
+   header("location:" . app_url('nhacungcap'));
    exit;
 }
 
@@ -447,7 +451,7 @@ if (isset($_POST['supplier_update_submit'])) {
 
    if ($supplier_id <= 0) {
       $_SESSION['supplier_error'] = 'Nhà cung cấp không hợp lệ.';
-      header('location:user_page.php?nhacungcap');
+      header("location:" . app_url('nhacungcap'));
       exit;
    }
 
@@ -506,7 +510,7 @@ if (isset($_POST['supplier_update_submit'])) {
       }
    }
 
-   header('location:user_page.php?nhacungcap');
+   header("location:" . app_url('nhacungcap'));
    exit;
 }
 
@@ -517,7 +521,7 @@ if (isset($_POST['supplier_delete_submit'])) {
    $supplier_id = (int)($_POST['supplier_id'] ?? 0);
    if ($supplier_id <= 0) {
       $_SESSION['supplier_error'] = 'Nhà cung cấp không hợp lệ.';
-      header('location:user_page.php?nhacungcap');
+      header("location:" . app_url('nhacungcap'));
       exit;
    }
 
@@ -529,14 +533,14 @@ if (isset($_POST['supplier_delete_submit'])) {
 
    if ($used_count > 0) {
       $_SESSION['supplier_error'] = 'Không thể xóa nhà cung cấp vì đã tồn tại trong phiếu nhập.';
-      header('location:user_page.php?nhacungcap');
+      header("location:" . app_url('nhacungcap'));
       exit;
    }
 
    $delete = "UPDATE suppliers SET status = 'inactive' WHERE supplier_id = {$supplier_id}";
    mysqli_query($conn, $delete);
    $_SESSION['supplier_success'] = 'Đã xóa (ẩn) nhà cung cấp thành công.';
-   header('location:user_page.php?nhacungcap');
+   header("location:" . app_url('nhacungcap'));
    exit;
 }
 
@@ -599,7 +603,7 @@ if (isset($_POST['warehouse_receipt_submit'])) {
       $_SESSION['warehouse_receipt_error'] = $result['error'] ?? ($result['message'] ?? 'Tạo phiếu nhập thất bại');
    }
 
-   header('location:user_page.php?phieunhap');
+   header("location:" . app_url('phieunhap'));
    exit;
 }
 
@@ -628,7 +632,7 @@ if (isset($_POST['warehouse_receipt_update_submit'])) {
       $_SESSION['warehouse_receipt_error'] = $result['error'] ?? ($result['message'] ?? 'Cập nhật phiếu nhập thất bại');
    }
 
-   header('location:user_page.php?phieunhap');
+   header("location:" . app_url('phieunhap'));
    exit;
 }
 
@@ -637,7 +641,7 @@ if (isset($_POST['warehouse_receipt_delete_submit'])) {
 
    $_SESSION['warehouse_receipt_error'] = 'Hệ thống không cho phép xóa phiếu nhập để đảm bảo toàn vẹn dữ liệu tồn kho.';
 
-   header('location:user_page.php?phieunhap');
+   header("location:" . app_url('phieunhap'));
    exit;
 }
 
@@ -655,7 +659,7 @@ if (isset($_POST['add_position'])) {
         mysqli_query($conn, "INSERT INTO positions (position_name, base_salary, description) VALUES ('$name', $salary, '$desc')");
         setNotify('success', "Đã thêm chức vụ '$name'.");
     }
-    header('Location: user_page.php?chucvu'); exit;
+    header("location:" . app_url('chucvu')); exit;
 }
 
 if (isset($_POST['edit_position'])) {
@@ -672,7 +676,7 @@ if (isset($_POST['edit_position'])) {
     } else {
         setNotify('error', 'Dữ liệu chức vụ không hợp lệ.');
     }
-    header('Location: user_page.php?chucvu'); exit;
+    header("location:" . app_url('chucvu')); exit;
 }
 
 if (isset($_POST['change_employee_position'])) {
@@ -696,7 +700,7 @@ if (isset($_POST['change_employee_position'])) {
     } else {
         setNotify('error', 'Dữ liệu không hợp lệ.');
     }
-    header('Location: user_page.php?chucvu'); exit;
+    header("location:" . app_url('chucvu')); exit;
 }
 
 // =====================================================================

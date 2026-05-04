@@ -134,7 +134,7 @@ $top_customers = $cust_r ? mysqli_fetch_all($cust_r, MYSQLI_ASSOC) : [];
     <div class="head-line"></div>
 
     <!-- Bộ lọc -->
-    <form class="row g-2 align-items-end mt-2 mb-3" method="GET" action="user_page.php">
+    <form class="row g-2 align-items-end mt-2 mb-3" method="GET" action="<?= app_url() ?>">
         <input type="hidden" name="baocao_kinhdoanh" value="1">
         <div class="col-md-2">
             <label class="form-label">Năm</label>
@@ -417,7 +417,7 @@ async function showSalesDetail(itemId, itemName) {
     try {
         const year = <?= $sel_year ?>;
         const month = <?= $sel_month ?>;
-        const res = await fetch(`api/business/product_sales_details.php?item_id=${itemId}&year=${year}&month=${month}`);
+        const res = await fetch(`<?= getBaseUrl() ?>/api/business/product_sales_details.php?item_id=${itemId}&year=${year}&month=${month}`);
         const result = await res.json();
 
         if (result.success) {

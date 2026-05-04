@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const res = await fetch('api/user/profile.php', {
+            const res = await fetch('<?= getBaseUrl() ?>/api/user/profile.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -268,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const res = await fetch('api/user/profile.php', {
+            const res = await fetch('<?= getBaseUrl() ?>/api/user/profile.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

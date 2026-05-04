@@ -4,8 +4,18 @@ require_once __DIR__ . '/components/SearchBox.php';
 require_once __DIR__ . '/components/FilterPanel.php';
 require_once __DIR__ . '/components/Table.php';
 
-$view = $_GET['view'] ?? 'products';
-if (!in_array($view, ['products', 'suppliers'], true)) {
+$view = $_GET['view'] ?? null;
+$handled_views = ['products', 'suppliers'];
+$is_home = (empty($_GET) && empty($_POST)) || isset($_GET['home']) || isset($_GET['dashboard']);
+$is_handled_view = $view && in_array($view, $handled_views, true);
+
+if (!$is_home && !$is_handled_view) {
+    define('IS_ADMIN_ROUTER', true);
+    require_once __DIR__ . '/../user_page.php';
+    exit;
+}
+
+if (!in_array($view, $handled_views, true)) {
     $view = 'products';
 }
 

@@ -84,7 +84,7 @@ $ds_sanpham    = $ds_sanpham_rs ? mysqli_fetch_all($ds_sanpham_rs, MYSQLI_ASSOC)
     <div class="container-fluid row justify-content-between">
 
         <!-- Thanh tìm kiếm và bộ lọc sản phẩm -->
-        <form method="GET" action="user_page.php" class="col-8 my-2" role="search">
+        <form method="GET" action="<?= app_url() ?>" class="col-8 my-2" role="search">
             <input type="hidden" name="sanpham" value="">
             
             <?php 
@@ -128,14 +128,14 @@ $ds_sanpham    = $ds_sanpham_rs ? mysqli_fetch_all($ds_sanpham_rs, MYSQLI_ASSOC)
                         Giá bán <?= $price_icon ?>
                     </button>
                     
-                    <a href="user_page.php?sanpham" class="btn btn-outline-danger ms-auto text-nowrap" title="Xóa toàn bộ bộ lọc và sắp xếp">Hủy lọc</a>
+                    <a href="<?= app_url() ?>?sanpham" class="btn btn-outline-danger ms-auto text-nowrap" title="Xóa toàn bộ bộ lọc và sắp xếp">Hủy lọc</a>
                 </div>
             </div>
         </form>
 
         <?php if (can(AppPermission::MANAGE_CATALOG)) : ?>
             <div class="text-end col-4">
-                <a href="user_page.php?sanpham=them" class="my-2 btn btn-success fw-bolder">
+                <a href="<?= app_url() ?>?sanpham=them" class="my-2 btn btn-success fw-bolder">
                     <i class="fa-solid fa-file-circle-plus"></i> Thêm
                 </a>
             </div>
@@ -199,18 +199,18 @@ $ds_sanpham    = $ds_sanpham_rs ? mysqli_fetch_all($ds_sanpham_rs, MYSQLI_ASSOC)
                             </td>
                             <?php if (can(AppPermission::MANAGE_CATALOG)): ?>
                                 <td>
-                                    <a href="user_page.php?sanpham=xem&id=<?= (int)$sp['item_id'] ?>"
+                                    <a href="<?= app_url() ?>?sanpham=xem&id=<?= (int)$sp['item_id'] ?>"
                                        class="btn btn-sm btn-outline-info me-1" title="Xem chi tiết">
                                         <i class="fa-solid fa-eye"></i>
                                     </a>
-                                    <a href="user_page.php?sanpham=sua&id=<?= (int)$sp['item_id'] ?>"
+                                    <a href="<?= app_url() ?>?sanpham=sua&id=<?= (int)$sp['item_id'] ?>"
                                        class="btn btn-sm btn-outline-success" title="Chỉnh sửa">
                                         <i class="fa-solid fa-pen"></i>
                                     </a>
                                 </td>
                             <?php else: ?>
                                 <td>
-                                    <a href="user_page.php?sanpham=xem&id=<?= (int)$sp['item_id'] ?>"
+                                    <a href="<?= app_url() ?>?sanpham=xem&id=<?= (int)$sp['item_id'] ?>"
                                        class="btn btn-sm btn-outline-info" title="Xem chi tiết">
                                         <i class="fa-solid fa-eye"></i>
                                     </a>

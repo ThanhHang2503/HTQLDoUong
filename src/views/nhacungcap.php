@@ -51,7 +51,7 @@ if ($editSupplierId > 0) {
             <div class="card mb-3">
                 <div class="card-header fw-bold">Thêm nhà cung cấp</div>
                 <div class="card-body">
-                    <form method="POST" action="user_page.php?nhacungcap">
+                    <form method="POST" action="<?= app_url() ?>?nhacungcap">
                         <input type="hidden" name="supplier_submit" value="1">
 
                         <div class="mb-2">
@@ -83,7 +83,7 @@ if ($editSupplierId > 0) {
             <div class="card">
                 <div class="card-header fw-bold">Tìm kiếm nhà cung cấp</div>
                 <div class="card-body">
-                    <form method="GET" action="user_page.php" class="row g-2">
+                    <form method="GET" action="<?= app_url() ?>" class="row g-2">
                         <input type="hidden" name="nhacungcap" value="1">
                         <div class="col-9">
                             <input class="form-control" type="text" name="timkiem-ncc" value="<?= htmlspecialchars($keyword) ?>" placeholder="Tên, mã, liên hệ, số điện thoại...">
@@ -103,7 +103,7 @@ if ($editSupplierId > 0) {
                     <?php if (!$editSupplier): ?>
                         <p class="mb-0">Chọn nhà cung cấp ở danh sách bên dưới để chỉnh sửa.</p>
                     <?php else: ?>
-                        <form method="POST" action="user_page.php?nhacungcap">
+                        <form method="POST" action="<?= app_url() ?>?nhacungcap">
                             <input type="hidden" name="supplier_update_submit" value="1">
                             <input type="hidden" name="supplier_id" value="<?= (int)$editSupplier['supplier_id'] ?>">
 
@@ -160,8 +160,8 @@ if ($editSupplierId > 0) {
                                         <td><?= htmlspecialchars((string)$s['contact_name']) ?></td>
                                         <td><?= htmlspecialchars((string)$s['phone_number']) ?></td>
                                         <td>
-                                            <a class="btn btn-sm btn-outline-primary" href="user_page.php?nhacungcap&edit_supplier_id=<?= (int)$s['supplier_id'] ?>">Sửa</a>
-                                            <form method="POST" action="user_page.php?nhacungcap" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa nhà cung cấp này không?');">
+                                            <a class="btn btn-sm btn-outline-primary" href="<?= app_url() ?>?nhacungcap&edit_supplier_id=<?= (int)$s['supplier_id'] ?>">Sửa</a>
+                                            <form method="POST" action="<?= app_url() ?>?nhacungcap" class="d-inline" onsubmit="return confirm('Bạn có chắc chắn muốn xóa nhà cung cấp này không?');">
                                                 <input type="hidden" name="supplier_delete_submit" value="1">
                                                 <input type="hidden" name="supplier_id" value="<?= (int)$s['supplier_id'] ?>">
                                                 <button class="btn btn-sm btn-outline-danger" type="submit">Xóa</button>

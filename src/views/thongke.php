@@ -25,7 +25,7 @@ require('./src/models/thongke.php');
                         <div>
                             <hr>
                             <button type="submit" class="btn btn-success mt-2 mr-2">Thống kê</button>
-                            <a href="user_page.php?thongke" class="btn btn-danger mt-2 mr-2">Hủy</a>
+                            <a href="<?= app_url() ?>?thongke" class="btn btn-danger mt-2 mr-2">Hủy</a>
                         </div>
 
                     </div>

@@ -94,14 +94,14 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
 <body class="app-shell"<?= $_notify_attrs ?>>
     <div class="nav-side p-0">
         <div class="logo p-1 justify-content-center text-center">
-            <a href="user_page.php?home"> <img src="img/logo.jpg" alt="Logo"></a>
+            <a href="<?= app_url() ?>?home"> <img src="img/logo.jpg" alt="Logo"></a>
         </div>
 
         <div class="navs pt-3">
             <?php if (!$isManagerRole) : ?>
             <div class="container-fluid">
                 <a class="text-truncate <?= isset($_GET['home'])||isset($_GET['dashboard']) ? 'active' : '' ?>"
-                   href="user_page.php?home"><i class="fa-solid fa-house-chimney"></i> Home</a>
+                   href="<?= app_url() ?>?home"><i class="fa-solid fa-house-chimney"></i> Home</a>
             </div>
             <?php endif; ?>
 
@@ -112,23 +112,23 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
                 <div class="nav-section-label">KHO HÀNG</div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['loai']) ? 'active' : '' ?>"
-                       href="user_page.php?loai"><i class="fa-solid fa-list"></i> Loại SP</a>
+                       href="<?= app_url() ?>?loai"><i class="fa-solid fa-list"></i> Loại SP</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['sanpham']) ? 'active' : '' ?>"
-                       href="user_page.php?sanpham"><i class="fa-solid fa-mug-hot"></i> Sản Phẩm</a>
+                       href="<?= app_url() ?>?sanpham"><i class="fa-solid fa-mug-hot"></i> Sản Phẩm</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['phieunhap']) ? 'active' : '' ?>"
-                       href="user_page.php?phieunhap"><i class="fa-solid fa-file-import"></i> Phiếu nhập</a>
+                       href="<?= app_url() ?>?phieunhap"><i class="fa-solid fa-file-import"></i> Phiếu nhập</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['nhacungcap']) ? 'active' : '' ?>"
-                       href="user_page.php?nhacungcap"><i class="fa-solid fa-truck-field"></i> Nhà cung cấp</a>
+                       href="<?= app_url() ?>?nhacungcap"><i class="fa-solid fa-truck-field"></i> Nhà cung cấp</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['baocao_kho']) ? 'active' : '' ?>"
-                       href="user_page.php?baocao_kho"><i class="fa-solid fa-warehouse"></i> Báo cáo kho</a>
+                       href="<?= app_url() ?>?baocao_kho"><i class="fa-solid fa-warehouse"></i> Báo cáo kho</a>
                 </div>
             <?php endif; ?>
 
@@ -137,15 +137,15 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
                 <div class="nav-section-label">BÁN HÀNG</div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['donhang']) ? 'active' : '' ?>"
-                       href="user_page.php?donhang"><i class="fa-solid fa-receipt"></i> Đơn hàng</a>
+                       href="<?= app_url() ?>?donhang"><i class="fa-solid fa-receipt"></i> Đơn hàng</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['khachhang']) ? 'active' : '' ?>"
-                       href="user_page.php?khachhang"><i class="fa-solid fa-address-book"></i> Khách hàng</a>
+                       href="<?= app_url() ?>?khachhang"><i class="fa-solid fa-address-book"></i> Khách hàng</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['baocao_kinhdoanh']) ? 'active' : '' ?>"
-                       href="user_page.php?baocao_kinhdoanh"><i class="fa-solid fa-chart-line"></i> Báo cáo kinh doanh</a>
+                       href="<?= app_url() ?>?baocao_kinhdoanh"><i class="fa-solid fa-chart-line"></i> Báo cáo kinh doanh</a>
                 </div>
             <?php endif; ?>
         </div>
@@ -159,23 +159,23 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
             <div class="navs text-center p-0">
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['chucvu']) ? 'active' : '' ?>"
-                       href="user_page.php?chucvu"><i class="fa-solid fa-briefcase"></i> Chức vụ</a>
+                       href="<?= app_url() ?>?chucvu"><i class="fa-solid fa-briefcase"></i> Chức vụ</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['nhansu']) ? 'active' : '' ?>"
-                       href="user_page.php?nhansu"><i class="fa-solid fa-users"></i> DS nhân sự</a>
+                       href="<?= app_url() ?>?nhansu"><i class="fa-solid fa-users"></i> DS nhân sự</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['bangluong']) ? 'active' : '' ?>"
-                       href="user_page.php?bangluong"><i class="fa-solid fa-file-invoice-dollar"></i> Lương</a>
+                       href="<?= app_url() ?>?bangluong"><i class="fa-solid fa-file-invoice-dollar"></i> Lương</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['luong_ca_nhan']) ? 'active' : '' ?>"
-                       href="user_page.php?luong_ca_nhan"><i class="fa-solid fa-wallet"></i> Lương của tôi</a>
+                       href="<?= app_url() ?>?luong_ca_nhan"><i class="fa-solid fa-wallet"></i> Lương của tôi</a>
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['donnghi']) ? 'active' : '' ?>"
-                       href="user_page.php?donnghi">
+                       href="<?= app_url() ?>?donnghi">
                         <i class="fa-solid fa-calendar-check"></i> Đơn nghỉ phép
                         <?php if ($pending_leave_count > 0): ?>
                         <span class="badge text-bg-danger"><?= $pending_leave_count ?></span>
@@ -184,7 +184,7 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['donnghiviec']) ? 'active' : '' ?>"
-                       href="user_page.php?donnghiviec">
+                       href="<?= app_url() ?>?donnghiviec">
                         <i class="fa-solid fa-door-open"></i> Đơn nghỉ việc
                         <?php if ($pending_resignation_count > 0): ?>
                         <span class="badge text-bg-danger"><?= $pending_resignation_count ?></span>
@@ -193,7 +193,7 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
                 </div>
                 <div class="container-fluid">
                     <a class="text-truncate <?= isset($_GET['profile']) ? 'active' : '' ?>"
-                       href="user_page.php?profile"><i class="fa-solid fa-user-pen"></i> Hồ sơ cá nhân</a>
+                       href="<?= app_url() ?>?profile"><i class="fa-solid fa-user-pen"></i> Hồ sơ cá nhân</a>
                 </div>
             </div>
         <?php endif; ?>
@@ -204,19 +204,19 @@ $_notify_attrs   = notifyAttrs($_notify_type, $_notify_msg, $_notify_title);
         <div class="navs text-center p-0">
             <div class="container-fluid">
                 <a class="text-truncate <?= isset($_GET['donnghi']) ? 'active' : '' ?>"
-                   href="user_page.php?donnghi"><i class="fa-solid fa-calendar-minus"></i> Đơn nghỉ phép</a>
+                   href="<?= app_url() ?>?donnghi"><i class="fa-solid fa-calendar-minus"></i> Đơn nghỉ phép</a>
             </div>
             <div class="container-fluid">
                 <a class="text-truncate <?= isset($_GET['donnghiviec']) ? 'active' : '' ?>"
-                   href="user_page.php?donnghiviec"><i class="fa-solid fa-door-open"></i> Đơn nghỉ việc</a>
+                   href="<?= app_url() ?>?donnghiviec"><i class="fa-solid fa-door-open"></i> Đơn nghỉ việc</a>
             </div>
             <div class="container-fluid">
                 <a class="text-truncate <?= isset($_GET['luong_ca_nhan']) ? 'active' : '' ?>"
-                   href="user_page.php?luong_ca_nhan"><i class="fa-solid fa-wallet"></i> Lương của tôi</a>
+                   href="<?= app_url() ?>?luong_ca_nhan"><i class="fa-solid fa-wallet"></i> Lương của tôi</a>
             </div>
             <div class="container-fluid">
                 <a class="text-truncate <?= isset($_GET['profile']) ? 'active' : '' ?>"
-                   href="user_page.php?profile"><i class="fa-solid fa-user-pen"></i> Hồ sơ cá nhân</a>
+                   href="<?= app_url() ?>?profile"><i class="fa-solid fa-user-pen"></i> Hồ sơ cá nhân</a>
             </div>
         </div>
         <?php endif; ?>

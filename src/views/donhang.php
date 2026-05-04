@@ -35,10 +35,10 @@ if (!isset($ds_donhang_timkiem)) {
             <input class="form-control me-2" type="text" placeholder="Tìm kiếm theo ID, khách hàng hoặc nhân viên..." 
                    name='timkiem-donhang' value="<?= htmlspecialchars($_GET['timkiem-donhang'] ?? '') ?>" aria-label="Search">
             <button class="btn btn-outline-success me-2" type="submit">Tìm</button>
-            <a href="user_page.php?donhang" class="btn btn-outline-danger" style="white-space: nowrap;" title="Xóa bộ lọc tìm kiếm">Hủy lọc</a>
+            <a href="<?= app_url() ?>?donhang" class="btn btn-outline-danger" style="white-space: nowrap;" title="Xóa bộ lọc tìm kiếm">Hủy lọc</a>
         </form>
         <div class="text-end col-4">
-            <a href="user_page.php?donhang=them" class="my-2 btn btn-success fw-bolder"><i class="fa-solid fa-file-circle-plus"></i> Tạo mới hóa đơn</a>
+            <a href="<?= app_url() ?>?donhang=them" class="my-2 btn btn-success fw-bolder"><i class="fa-solid fa-file-circle-plus"></i> Tạo mới hóa đơn</a>
         </div>
         <!-- Bảng hiển thị đơn hàng  -->
         <table id="myTable" class="table container-fluid text-center table-hover table-striped table-bordered">
@@ -62,8 +62,8 @@ if (!isset($ds_donhang_timkiem)) {
                         <td><?= $hd[3] ?></td>
                         <td class="fw-bold text-success"><?= number_format((int)$hd[4], 0, ',', '.') ?> VNĐ</td>
                         <td>
-                            <a href="user_page.php?donhang=in&id=<?= $hd[0] ?>" title="Xem chi tiết" class="me-1"><i class="btn btn-outline-info fa-solid fa-eye"></i></a>
-                            <a href="user_page.php?donhang=in&id=<?= $hd[0] ?>" title="In hóa đơn"><i class="btn btn-outline-primary fa-solid fa-print"></i></a>
+                            <a href="<?= app_url() ?>?donhang=in&id=<?= $hd[0] ?>" title="Xem chi tiết" class="me-1"><i class="btn btn-outline-info fa-solid fa-eye"></i></a>
+                            <a href="<?= app_url() ?>?donhang=in&id=<?= $hd[0] ?>" title="In hóa đơn"><i class="btn btn-outline-primary fa-solid fa-print"></i></a>
                         </td>
                     </tr>
                 <?php endforeach; ?>

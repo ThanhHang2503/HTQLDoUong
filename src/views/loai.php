@@ -13,7 +13,7 @@ $ds_loai = mysqli_fetch_all($ds_loai);
         <?php if (can(AppPermission::MANAGE_CATALOG)) : ?>
             <div class="text-end">
 
-                <a href="user_page.php?loai=them" class="my-2 btn btn-success fw-bolder"><i class="fa-solid fa-file-circle-plus"></i> Thêm</a>
+                <a href="<?= app_url() ?>?loai=them" class="my-2 btn btn-success fw-bolder"><i class="fa-solid fa-file-circle-plus"></i> Thêm</a>
             </div>
         <?php endif; ?>
         <table id="myTable" class="table container-fluid text-center table-hover table-striped table-bordered">
@@ -32,7 +32,7 @@ $ds_loai = mysqli_fetch_all($ds_loai);
                     <td><?= $lo[1] ?></td>
                     <?php
                     if (can(AppPermission::MANAGE_CATALOG))
-                        echo '<td><a href="user_page.php?loai=sua&id=' . $lo[0] . '"><i class="btn btn-outline-success fa-solid fa-pen"></i> </a></td>';
+                        echo '<td><a href="<?= app_url() ?>?loai=sua&id=' . $lo[0] . '"><i class="btn btn-outline-success fa-solid fa-pen"></i> </a></td>';
                     ?>
                 </tr>
             <?php endforeach; ?>

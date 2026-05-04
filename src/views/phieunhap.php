@@ -124,7 +124,7 @@ $productOptionsHtml = ob_get_clean();
                     <i class="fa-solid fa-filter me-1"></i> Tìm kiếm và Lọc phiếu nhập
                 </div>
                 <div class="card-body">
-                    <form method="GET" action="user_page.php" id="filter-receipt-form">
+                    <form method="GET" action="<?= app_url() ?>" id="filter-receipt-form">
                         <input type="hidden" name="phieunhap" value="1">
                         <div class="row g-2">
                             <div class="col-md-6 mb-2">
@@ -162,7 +162,7 @@ $productOptionsHtml = ob_get_clean();
                                 <input type="date" class="form-control form-control-sm" name="filter_date_to" value="<?= htmlspecialchars($filterDateTo) ?>">
                             </div>
                             <div class="col-12 mt-1 d-flex justify-content-end gap-2">
-                                <a href="user_page.php?phieunhap" class="btn btn-sm btn-outline-secondary">Xóa lọc</a>
+                                <a href="<?= app_url() ?>?phieunhap" class="btn btn-sm btn-outline-secondary">Xóa lọc</a>
                                 <button type="submit" class="btn btn-sm btn-primary">
                                     <i class="fa-solid fa-magnifying-glass"></i> Lọc
                                 </button>
@@ -221,7 +221,7 @@ $productOptionsHtml = ob_get_clean();
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body bg-light">
-                <form method="POST" action="user_page.php?phieunhap" id="warehouse-create-receipt-form" onsubmit="return validateCreateReceiptForm()">
+                <form method="POST" action="<?= app_url() ?>?phieunhap" id="warehouse-create-receipt-form" onsubmit="return validateCreateReceiptForm()">
                     <input type="hidden" name="warehouse_receipt_submit" value="1">
 
                     <div class="row g-3 mb-3">
@@ -311,7 +311,7 @@ $productOptionsHtml = ob_get_clean();
                     <div class="spinner-border text-primary" role="status"></div>
                 </div>
 
-                <form method="POST" action="user_page.php?phieunhap" id="warehouse-edit-receipt-form" style="display:none;" onsubmit="return validateEditReceiptForm()">
+                <form method="POST" action="<?= app_url() ?>?phieunhap" id="warehouse-edit-receipt-form" style="display:none;" onsubmit="return validateEditReceiptForm()">
                     <input type="hidden" name="warehouse_receipt_update_submit" value="1">
                     <input type="hidden" name="receipt_id" id="edit_modal_receipt_id" value="0">
 
@@ -626,7 +626,7 @@ $productOptionsHtml = ob_get_clean();
         formData.append('purchase_price', purchase_price);
         formData.append('unit_price', unit_price);
 
-        fetch('user_page.php', { method: 'POST', body: formData })
+        fetch('<?= app_url() ?>', { method: 'POST', body: formData })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
@@ -781,7 +781,7 @@ $productOptionsHtml = ob_get_clean();
             const modal = new bootstrap.Modal(modalEl);
             modal.show();
 
-            fetch('user_page.php?get_receipt_api=1&receipt_id=' + btnId)
+            fetch('<?= app_url() ?>?get_receipt_api=1&receipt_id=' + btnId)
                 .then(res => res.json())
                 .then(res => {
                     if (!res.success) {

@@ -16,6 +16,7 @@ class HRAuthMiddleware {
      */
     public static function requireHRAccess(): void {
         if (session_status() === PHP_SESSION_NONE) {
+            session_name('SESSION_USER');
             session_start();
         }
 

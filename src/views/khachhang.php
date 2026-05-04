@@ -88,8 +88,8 @@ if (!isset($ds_kh_timkiem)) {
                         <div class="d-flex align-items-center justify-content-center">
                             <span>Mã số</span>
                             <div class="ms-2 d-flex flex-row">
-                                <a href="user_page.php?khachhang=id_tang" class="text-white me-1"><i class="fa-solid fa-sort-up"></i></a>
-                                <a href="user_page.php?khachhang=id_giam" class="text-white"><i class="fa-solid fa-sort-down"></i></a>
+                                <a href="<?= app_url() ?>?khachhang=id_tang" class="text-white me-1"><i class="fa-solid fa-sort-up"></i></a>
+                                <a href="<?= app_url() ?>?khachhang=id_giam" class="text-white"><i class="fa-solid fa-sort-down"></i></a>
                             </div>
                         </div>
                     </th>
@@ -101,8 +101,8 @@ if (!isset($ds_kh_timkiem)) {
                         <div class="d-flex align-items-center justify-content-center">
                             <span>Ngày tạo</span>
                             <div class="ms-2 d-flex flex-row">
-                                <a href="user_page.php?khachhang=ngay_tang" class="text-white me-1"><i class="fa-solid fa-sort-up"></i></a>
-                                <a href="user_page.php?khachhang=ngay_giam" class="text-white"><i class="fa-solid fa-sort-down"></i></a>
+                                <a href="<?= app_url() ?>?khachhang=ngay_tang" class="text-white me-1"><i class="fa-solid fa-sort-up"></i></a>
+                                <a href="<?= app_url() ?>?khachhang=ngay_giam" class="text-white"><i class="fa-solid fa-sort-down"></i></a>
                             </div>
                         </div>
                     </th>
@@ -130,10 +130,10 @@ if (!isset($ds_kh_timkiem)) {
                         <td><?= $created ?></td>
                         <td>
                             <div class="d-flex justify-content-center gap-2">
-                                <a href="user_page.php?khachhang=xem&id=<?= $cid ?>" class="btn btn-sm btn-outline-info" title="Xem chi tiết">
+                                <a href="<?= app_url() ?>?khachhang=xem&id=<?= $cid ?>" class="btn btn-sm btn-outline-info" title="Xem chi tiết">
                                     <i class="fa-solid fa-eye"></i>
                                 </a>
-                                <a href="user_page.php?khachhang=sua&id=<?= $cid ?>" class="btn btn-sm btn-outline-primary" title="Chỉnh sửa">
+                                <a href="<?= app_url() ?>?khachhang=sua&id=<?= $cid ?>" class="btn btn-sm btn-outline-primary" title="Chỉnh sửa">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
                             </div>
@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btnAdd.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Đang lưu...';
 
             try {
-                const response = await fetch('api/admin/customers.php', {
+                const response = await fetch('<?= getBaseUrl() ?>/api/admin/customers.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

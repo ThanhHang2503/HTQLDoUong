@@ -66,7 +66,7 @@ foreach ($rows as $row) {
     <div class="head-line"></div>
 
     <div class="container-fluid my-3">
-        <form class="row g-2 align-items-end" method="GET" action="user_page.php">
+        <form class="row g-2 align-items-end" method="GET" action="<?= app_url() ?>">
             <input type="hidden" name="kho_thongke" value="1">
             <div class="col-lg-4">
                 <label class="form-label">Tìm theo tên sản phẩm</label>

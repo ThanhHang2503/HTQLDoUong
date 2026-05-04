@@ -78,7 +78,7 @@ if ($edit_pos_id > 0) {
                                 <button type="submit" name="edit_position" class="btn btn-warning fw-bold flex-fill">
                                     <i class="fa-solid fa-floppy-disk me-1"></i>Cập nhật
                                 </button>
-                                <a href="user_page.php?chucvu" class="btn btn-outline-secondary">Hủy</a>
+                                <a href="<?= app_url() ?>?chucvu" class="btn btn-outline-secondary">Hủy</a>
                             </div>
                             <?php else: ?>
                             <button type="submit" name="add_position" class="btn btn-primary w-100 fw-bold">
@@ -169,7 +169,7 @@ if ($edit_pos_id > 0) {
                                             </span>
                                         </td>
                                         <td>
-                                            <a href="user_page.php?chucvu&edit_id=<?= $pos['position_id'] ?>"
+                                            <a href="<?= app_url() ?>?chucvu&edit_id=<?= $pos['position_id'] ?>"
                                                class="btn btn-sm btn-outline-primary">
                                                 <i class="fa-solid fa-pen"></i>
                                             </a>
@@ -271,7 +271,7 @@ function viewHistory(accId, name) {
     }
     if (historyModalObj) historyModalObj.show();
 
-    fetch('user_page.php?chucvu_history_api=1&account_id=' + accId)
+    fetch('<?= app_url() ?>?chucvu_history_api=1&account_id=' + accId)
         .then(r => r.json())
         .then(data => {
             let html = '<div class="table-responsive"><table class="table table-striped table-hover mb-0"><thead><tr class="table-light"><th>Chức vụ</th><th>Từ ngày</th><th>Đến ngày</th></tr></thead><tbody>';
@@ -320,7 +320,7 @@ document.getElementById('formChangePosition').addEventListener('submit', async f
     };
 
     try {
-        const res = await fetch(`api/hr/index.php/employees/${aid}/position`, {
+        const res = await fetch(`<?= getBaseUrl() ?>/api/hr/index.php/employees/${aid}/position`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -331,7 +331,7 @@ document.getElementById('formChangePosition').addEventListener('submit', async f
             showResult(true, "Thành Công", result.message);
             // Reload page sau khi đóng modal để cập nhật bảng (hoặc cập nhật inline)
             document.getElementById('modalResult').addEventListener('hidden.bs.modal', function() {
-                window.location.href = 'user_page.php?chucvu';
+                window.location.href = "<?= app_url() ?>?chucvu";
             }, { once: true });
         } else {
             showResult(false, "Không Thể Cập Nhật", result.error || result.message);

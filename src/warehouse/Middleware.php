@@ -9,6 +9,7 @@ namespace Warehouse\Middleware;
 class WarehouseAuthMiddleware {
     public static function requireWarehouseAccess(\mysqli $conn): void {
         if (session_status() === PHP_SESSION_NONE) {
+            session_name('SESSION_USER');
             session_start();
         }
 

@@ -95,13 +95,31 @@ function can(string $permission): bool
     return in_array($permission, $permissions[$role], true);
 }
 
+function getBaseUrl(): string
+{
+    $docRoot = str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']);
+    $projectRoot = str_replace('\\', '/', dirname(__DIR__, 2));
+    // Fallback if the project is outside DocumentRoot or some alias config is used
+    if (strpos($projectRoot, $docRoot) === 0) {
+        return str_replace($docRoot, '', $projectRoot);
+    }
+    // Simple fallback to getting the first folder from SCRIPT_NAME if it doesn't match
+    $parts = explode('/', trim($_SERVER['SCRIPT_NAME'], '/'));
+    if (count($parts) > 1) {
+        return '/' . $parts[0];
+    }
+    return '';
+}
+
 function requireLogin(): void
 {
     if (!isLoggedIn()) {
+        $portal = (session_name() === 'SESSION_ADMIN') ? 'admin' : 'user';
+        $login_url = getBaseUrl() . "/login_form.php?portal=$portal";
         if (headers_sent()) {
-            echo '<script>window.location.href="login_form.php";</script>';
+            echo '<script>window.location.href="' . $login_url . '";</script>';
         } else {
-            header('location:login_form.php');
+            header('location:' . $login_url);
         }
         exit;
     }
@@ -111,10 +129,11 @@ function requirePermission(string $permission): void
 {
     requireLogin();
     if (!can($permission)) {
+        $redirect_url = getBaseUrl() . "/user_page.php?home&error=forbidden";
         if (headers_sent()) {
-            echo '<script>window.location.href="user_page.php?home&error=forbidden";</script>';
+            echo '<script>window.location.href="' . $redirect_url . '";</script>';
         } else {
-            header('location:user_page.php?home&error=forbidden');
+            header('location:' . $redirect_url);
         }
         exit;
     }
@@ -124,7 +143,8 @@ function requireRole(string $roleName): void
 {
     requireLogin();
     if (currentRole() !== $roleName) {
-        header('location:user_page.php?home&error=forbidden');
+        $redirect_url = getBaseUrl() . "/user_page.php?home&error=forbidden";
+        header('location:' . $redirect_url);
         exit;
     }
 }

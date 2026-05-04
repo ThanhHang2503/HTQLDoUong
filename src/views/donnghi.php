@@ -175,7 +175,7 @@ $status_class = ['chờ duyệt'=>'warning','chấp thuận'=>'success','từ ch
                     <div class="card-header fw-bold d-flex justify-content-between align-items-center">
                         <span><i class="fa-solid fa-list me-2"></i><?= $isManager ? 'Tất cả đơn nghỉ phép' : 'Đơn của tôi' ?></span>
                         <?php if ($isManager): ?>
-                        <form class="d-flex gap-2" method="GET" action="user_page.php">
+                        <form class="d-flex gap-2" method="GET" action="<?= app_url() ?>">
                             <input type="hidden" name="donnghi" value="1">
                             <select class="form-select form-select-sm" name="filter_status" style="width:auto">
                                 <option value="">Tất cả trạng thái</option>

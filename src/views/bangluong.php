@@ -185,7 +185,7 @@ if (isset($_GET['print'])) {
     <script>
     // Dùng afterprint để redirect sau khi hộp thoại in đóng lại
     window.addEventListener('afterprint', function() {
-        window.location.href = 'user_page.php?bangluong&month=<?= $sel_month ?>&year=<?= $sel_year ?>&print_success=1';
+        window.location.href = "<?= app_url() ?>?bangluong&month=<?= $sel_month ?>&year=<?= $sel_year ?>&print_success=1";
     });
     window.print();
     </script></body></html>
@@ -219,7 +219,7 @@ if (isset($_GET['print'])) {
     <!-- Bộ lọc tháng/năm -->
     <div class="row g-2 align-items-end mt-2 mb-3">
         <div class="col-auto">
-            <form class="d-flex gap-2 align-items-end" method="GET" action="user_page.php">
+            <form class="d-flex gap-2 align-items-end" method="GET" action="<?= app_url() ?>">
                 <input type="hidden" name="bangluong" value="1">
                 <div>
                     <label class="form-label mb-0">Tháng</label>
@@ -239,7 +239,7 @@ if (isset($_GET['print'])) {
         <div class="col-auto ms-auto">
             <?php if (!$future_blocked): ?>
             <a class="btn btn-outline-secondary"
-               href="user_page.php?bangluong&month=<?=$sel_month?>&year=<?=$sel_year?>&print=1">
+               href="<?= app_url() ?>?bangluong&month=<?=$sel_month?>&year=<?=$sel_year?>&print=1">
                 <i class="fa-solid fa-print me-1"></i>In bảng lương
             </a>
             <?php endif; ?>

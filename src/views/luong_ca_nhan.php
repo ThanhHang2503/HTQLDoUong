@@ -73,8 +73,8 @@ if ($is_print) {
     echo '<script>
     window.addEventListener("afterprint", function() {
         window.opener
-            ? window.opener.location.href = "user_page.php?luong_ca_nhan&year=' . $selected_year . '&month=' . $selected_month . '&print_success=1"
-            : (window.location.href = "user_page.php?luong_ca_nhan&year=' . $selected_year . '&month=' . $selected_month . '&print_success=1");
+            ? window.opener.location.href = "<?= app_url() ?>?luong_ca_nhan&year=' . $selected_year . '&month=' . $selected_month . '&print_success=1"
+            : (window.location.href = "<?= app_url() ?>?luong_ca_nhan&year=" . $selected_year . '&month=' . $selected_month . '&print_success=1");
         window.close();
     });
     window.print();
@@ -118,7 +118,7 @@ if ($is_print) {
     <?php endif; ?>
 
     <!-- Bộ lọc -->
-    <form class="row g-2 align-items-end mt-2" method="GET" action="user_page.php">
+    <form class="row g-2 align-items-end mt-2" method="GET" action="<?= app_url() ?>">
         <input type="hidden" name="luong_ca_nhan" value="1">
         <div class="col-md-3">
             <label class="form-label">Năm</label>
@@ -144,7 +144,7 @@ if ($is_print) {
         </div>
         <div class="col-md-2">
             <a class="btn btn-outline-secondary w-100"
-               href="user_page.php?luong_ca_nhan&year=<?= $selected_year ?>&month=<?= $selected_month ?>&print=1"
+               href="<?= app_url() ?>?luong_ca_nhan&year=<?= $selected_year ?>&month=<?= $selected_month ?>&print=1"
                target="_blank">
                 <i class="fa-solid fa-print me-1"></i>In bảng lương
             </a>

@@ -1,5 +1,6 @@
 <?php
 
+session_name('SESSION_ADMIN');
 session_start();
 header('Content-Type: text/html; charset=utf-8');
 require_once __DIR__ . '/../../config.php';

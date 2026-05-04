@@ -1,4 +1,10 @@
 <?php
+$portal = $_GET['portal'] ?? 'user';
+if ($portal === 'admin') {
+    session_name('SESSION_ADMIN');
+} else {
+    session_name('SESSION_USER');
+}
 session_start();
 include('config.php');
 require_once __DIR__ . '/src/models/authorization.php';

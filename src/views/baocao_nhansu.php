@@ -113,7 +113,7 @@ foreach ($monthly_wages as $mw) {
     <div class="head-line"></div>
 
     <!-- Bộ lọc -->
-    <form class="row g-2 align-items-end mt-2 mb-3" method="GET" action="user_page.php">
+    <form class="row g-2 align-items-end mt-2 mb-3" method="GET" action="<?= app_url() ?>">
         <input type="hidden" name="baocao_nhansu" value="1">
         <div class="col-md-2">
             <label class="form-label">Năm</label>

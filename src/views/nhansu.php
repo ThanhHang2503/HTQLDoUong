@@ -197,7 +197,7 @@ const currentRole = '<?= currentRole() ?>';
 var modalAccount = null;
 var modalToggle = null;
 var modalResult = null;
-const apiUrl = 'api/admin/accounts.php';
+const apiUrl = '<?= getBaseUrl() ?>/api/admin/accounts.php';
 
 // Format status badge
 function renderHrStatus(status) {
@@ -271,7 +271,7 @@ function renderTable() {
            // Nút Đổi chức vụ chỉ dành cho Quản lý nhân sự
         let posChangeBtn = '';
            if (currentRole === 'manager') {
-             posChangeBtn = `<a href="user_page.php?chucvu&account_id=${acc.account_id}" class="btn btn-sm btn-outline-warning" title="Chuyển sang module Thay đổi chức vụ"><i class="fa-solid fa-user-tag"></i></a>`;
+             posChangeBtn = `<a href="<?= app_url() ?>?chucvu&account_id=${acc.account_id}" class="btn btn-sm btn-outline-warning" title="Chuyển sang module Thay đổi chức vụ"><i class="fa-solid fa-user-tag"></i></a>`;
         }
 
         if (currentRole === 'admin') {
@@ -443,7 +443,7 @@ async function fetchHistory(id) {
     historySection.style.display = 'block';
 
     try {
-        const res = await fetch(`api/admin/history.php?account_id=${id}`);
+        const res = await fetch(`<?= getBaseUrl() ?>/api/admin/history.php?account_id=${id}`);
         const data = await res.json();
         if (data.success && data.data) {
             tbody.innerHTML = '';
