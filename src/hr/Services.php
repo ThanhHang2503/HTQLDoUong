@@ -67,9 +67,12 @@ class EmployeeService {
                 return;
             }
 
-            // Đóng bản ghi cũ: end_date = chính ngày thay đổi
-            // (Cho phép overlap để ngày đó vẫn tính là công nếu có trạng thái active)
-            mysqli_query($this->conn, "UPDATE employee_status_history SET end_date = '$change_date' WHERE history_id = $last_id");
+            // Đóng bản ghi cũ: end_date = ngày trước ngày thay đổi để không bị overlap
+            $yesterday = date('Y-m-d', strtotime($change_date . ' -1 day'));
+            if ($yesterday < $last_start) {
+                $yesterday = $last_start;
+            }
+            mysqli_query($this->conn, "UPDATE employee_status_history SET end_date = '$yesterday' WHERE history_id = $last_id");
         }
 
         // Tạo bản ghi trạng thái mới
@@ -532,11 +535,12 @@ class EmployeeService {
         $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
         $totalDaysInMonth = (int)date('t', strtotime($startOfMonth));
 
-        $sql = "SELECT status, start_date, end_date 
+        $sql = "SELECT history_id, status, start_date, end_date 
                 FROM employee_status_history 
                 WHERE account_id = $aid 
                 AND start_date <= '$endOfMonth' 
-                AND (end_date IS NULL OR end_date >= '$startOfMonth')";
+                AND (end_date IS NULL OR end_date >= '$startOfMonth')
+                ORDER BY start_date DESC, history_id DESC";
         $res = mysqli_query($this->conn, $sql);
         $history = mysqli_fetch_all($res, MYSQLI_ASSOC);
 
@@ -550,18 +554,18 @@ class EmployeeService {
             // Không tính ngày trong tương lai
             if ($ts > $todayTs) continue;
 
-            $isActive = false;
+            $current_status = null;
             foreach ($history as $h) {
                 $sTs = strtotime($h['start_date']);
                 $eTs = $h['end_date'] ? strtotime($h['end_date']) : strtotime('2099-12-31');
                 
-                if ($ts >= $sTs && $ts <= $eTs && $h['status'] === 'active') {
-                    $isActive = true;
+                if ($ts >= $sTs && $ts <= $eTs) {
+                    $current_status = $h['status'];
                     break;
                 }
             }
 
-            if ($isActive) {
+            if ($current_status === 'active') {
                 $activeDays++;
             }
         }
@@ -608,18 +612,20 @@ class SalaryService {
         $endOfMonth = date('Y-m-t', strtotime($startOfMonth));
         
         // A. Lịch sử trạng thái
-        $status_sql = "SELECT status, start_date, end_date FROM employee_status_history 
+        $status_sql = "SELECT history_id, status, start_date, end_date FROM employee_status_history 
                        WHERE account_id = $aid AND start_date <= '$endOfMonth' 
-                       AND (end_date IS NULL OR end_date >= '$startOfMonth')";
+                       AND (end_date IS NULL OR end_date >= '$startOfMonth')
+                       ORDER BY start_date DESC, history_id DESC";
         $st_res = mysqli_query($this->conn, $status_sql);
         $statusHistory = mysqli_fetch_all($st_res, MYSQLI_ASSOC);
 
         // B. Lịch sử chức vụ (Lấy base_salary tương ứng từng mốc)
-        $pos_sql = "SELECT eph.start_date, eph.end_date, p.base_salary 
+        $pos_sql = "SELECT eph.history_id, eph.start_date, eph.end_date, p.base_salary 
                     FROM employee_positions_history eph
                     JOIN positions p ON p.position_id = eph.position_id
                     WHERE eph.account_id = $aid AND eph.start_date <= '$endOfMonth'
-                    AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')";
+                    AND (eph.end_date IS NULL OR eph.end_date >= '$startOfMonth')
+                    ORDER BY eph.start_date DESC, eph.history_id DESC";
         $ps_res = mysqli_query($this->conn, $pos_sql);
         $posHistory = mysqli_fetch_all($ps_res, MYSQLI_ASSOC);
 
@@ -634,18 +640,18 @@ class SalaryService {
             $ts = strtotime($dateStr);
             if ($ts > $todayTs) continue;
 
-            // Kiểm tra Active (Ưu tiên: chỉ cần ANY record là active)
-            $isActive = false;
+            // Kiểm tra trạng thái cuối cùng trong ngày
+            $current_status = null;
             foreach ($statusHistory as $sh) {
                 $sTs = strtotime($sh['start_date']);
                 $eTs = $sh['end_date'] ? strtotime($sh['end_date']) : strtotime('2099-12-31');
-                if ($ts >= $sTs && $ts <= $eTs && $sh['status'] === 'active') {
-                    $isActive = true;
+                if ($ts >= $sTs && $ts <= $eTs) {
+                    $current_status = $sh['status'];
                     break;
                 }
             }
 
-            if ($isActive) {
+            if ($current_status === 'active') {
                 $actual_active_days++;
                 
                 // Tìm lương cơ bản của chức vụ tại ngày này

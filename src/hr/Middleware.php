@@ -16,7 +16,12 @@ class HRAuthMiddleware {
      */
     public static function requireHRAccess(): void {
         if (session_status() === PHP_SESSION_NONE) {
-            session_name('SESSION_USER');
+            $is_admin_referer = isset($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], '/admin/') !== false;
+            if ($is_admin_referer) {
+                session_name('SESSION_ADMIN');
+            } else {
+                session_name('SESSION_USER');
+            }
             session_start();
         }
 
