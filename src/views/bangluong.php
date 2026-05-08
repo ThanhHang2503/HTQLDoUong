@@ -98,7 +98,8 @@ if (!$future_blocked) {
             $calc = $salaryService->calculateSalary($e['account_id'], $sel_month, $sel_year);
             
             if ($calc['success']) {
-                $e['base_salary'] = $calc['pro_rated_base'];
+                $e['base_salary']          = $calc['pro_rated_base'];       // Lương thực tế theo ngày công
+                $e['original_base_salary'] = $calc['original_base_salary']; // Lương gốc full tháng
                 $e['working_days'] = $calc['actual_active_days'];
                 $e['effective_days'] = $calc['effective_days'];
                 $e['prorate_reason'] = $calc['actual_active_days'] < $totalDaysInMonth ? 'pro_rated' : '';
@@ -161,7 +162,7 @@ if (isset($_GET['print'])) {
     </style></head><body>
     <h2>BẢNG LƯƠNG THÁNG <?= $sel_month ?>/<?= $sel_year ?></h2>
     <table>
-    <thead><tr><th>#</th><th>Họ tên</th><th>Chức vụ</th><th>Lương CB</th><th>Phụ cấp</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực lĩnh</th><th>Ghi chú</th></tr></thead>
+    <thead><tr><th>#</th><th>Họ tên</th><th>Chức vụ</th><th>Lương thực tế</th><th>Phụ cấp</th><th>Thưởng</th><th>Khấu trừ</th><th>Thực lĩnh</th><th>Ghi chú</th></tr></thead>
     <tbody>
     <?php $i=1; foreach ($salary_records as $sr): ?>
     <tr><td><?=$i++?></td><td style="text-align:left"><?=htmlspecialchars($sr['full_name'])?></td>
@@ -281,6 +282,7 @@ if (isset($_GET['print'])) {
                                 <?php foreach ($employees as $emp): ?>
                                 <option value="<?= $emp['account_id'] ?>"
                                         data-salary="<?= $emp['base_salary'] ?>"
+                                        data-original-salary="<?= $emp['original_base_salary'] ?? $emp['base_salary'] ?>"
                                         data-deduction="<?= $emp['auto_deduction'] ?>"
                                         data-leave="<?= $emp['leave_days'] ?>"
                                         data-prorate-reason="<?= $emp['prorate_reason'] ?>"
@@ -300,13 +302,17 @@ if (isset($_GET['print'])) {
                             <input type="hidden" id="empSalaryStatus">
                         </div>
                         <div class="mb-2">
-                            <label class="form-label">Lương tính theo ngày làm thực tế <span id="prorateHint" class="text-info small ms-2"></span></label>
+                            <label class="form-label">Lương gốc (full tháng) <span id="originalSalaryFmt" class="text-muted small ms-2"></span></label>
+                            <input type="text" class="form-control bg-light text-muted" id="originalSalaryDisplay" disabled>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label fw-bold text-primary">Lương thực tế theo ngày công <span id="prorateHint" class="text-info small ms-2"></span></label>
                             <div class="input-group">
-                                <input type="text" class="form-control bg-light" id="baseSalaryDisplay" disabled>
+                                <input type="text" class="form-control bg-light fw-bold" id="baseSalaryDisplay" disabled>
                                 <input type="text" class="form-control bg-light" id="workingDaysDisplay" disabled style="width: 140px;">
                             </div>
                             <input type="hidden" name="base_salary_val" id="baseSalaryHidden">
-                            <small class="text-muted" style="font-size: 0.75rem;">Công thức: (Lương CB / <?= $totalDaysInMonth ?> ngày) × số ngày làm (Active)</small>
+                            <small class="text-muted" style="font-size: 0.75rem;">Công thức: (Lương gốc / <?= $totalDaysInMonth ?> ngày) × số ngày làm (Active)</small>
                         </div>
                            <div class="mb-2">
                             <label class="form-label fw-bold">Phụ cấp (VND) <span id="allowanceFmt" class="text-muted small ms-2"></span></label>
@@ -364,7 +370,7 @@ if (isset($_GET['print'])) {
                         <thead class="table-dark">
                             <tr>
                                 <th>Nhân viên</th>
-                                <th>Lương CB</th>
+                                <th title="Lương thực tế = (Lương gốc / số ngày chuẩn) × số ngày làm">Lương thực tế <i class="fa-solid fa-circle-info text-info small"></i></th>
                                 <th>Phụ cấp</th>
                                 <th>Thưởng</th>
                                 <th>Khấu trừ</th>
@@ -458,6 +464,7 @@ function clearEmpSearch() {
 function fillBaseSalary(sel) {
     const option = sel.options[sel.selectedIndex];
     if (!option.value) {
+        document.getElementById('originalSalaryDisplay').value = '';
         document.getElementById('baseSalaryDisplay').value = '';
         document.getElementById('baseSalaryHidden').value = '';
         document.getElementById('deductInput').value = 0;
@@ -468,15 +475,17 @@ function fillBaseSalary(sel) {
         return;
     }
 
-    const salary = parseInt(option.dataset.salary) || 0;
+    const salary = parseInt(option.dataset.salary) || 0;         // Lương thực tế theo ngày công
+    const origSalary = parseInt(option.dataset.originalSalary) || salary; // Lương gốc
     const autoDeduct = parseInt(option.dataset.deduction) || 0;
     const leaveDays = parseInt(option.dataset.leave) || 0;
     const workingDays = parseInt(option.dataset.days) || 0;
     const reason = option.dataset.prorateReason;
 
+    document.getElementById('originalSalaryDisplay').value = origSalary.toLocaleString('vi-VN') + ' VND';
     document.getElementById('baseSalaryDisplay').value = salary.toLocaleString('vi-VN') + ' VND';
     document.getElementById('workingDaysDisplay').value = workingDays + ' ngày làm';
-    document.getElementById('baseSalaryHidden').value = salary; 
+    document.getElementById('baseSalaryHidden').value = salary;
     document.getElementById('deductInput').value = autoDeduct;
     
     if (leaveDays > 0) {

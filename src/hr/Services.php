@@ -680,16 +680,17 @@ class SalaryService {
         $total = $pro_rated_base + $allowance + $bonus - $deductions;
         
         return [
-            'success' => true,
-            'position_id' => $position_id,
-            'base_salary' => $base_salary,
-            'actual_active_days' => $actual_active_days,
-            'effective_days' => $effective_days,
-            'pro_rated_base' => $pro_rated_base,
-            'allowance' => $allowance,
-            'bonus' => $bonus,
-            'deductions' => $deductions,
-            'total_salary' => $total,
+            'success'              => true,
+            'position_id'         => $position_id,
+            'original_base_salary'=> $base_salary,          // Lương gốc theo chức vụ (full tháng)
+            'base_salary'         => $pro_rated_base,       // Lương thực tế theo ngày công (dùng để lưu DB)
+            'actual_active_days'  => $actual_active_days,
+            'effective_days'      => $effective_days,
+            'pro_rated_base'      => $pro_rated_base,
+            'allowance'           => $allowance,
+            'bonus'               => $bonus,
+            'deductions'          => $deductions,
+            'total_salary'        => $total,
         ];
     }
 
@@ -713,14 +714,21 @@ class SalaryService {
                 return ['success' => false, 'error' => 'Lương tháng này đã được chốt chính thức, không thể chỉnh sửa.'];
             }
 
-            // Update
-            $existing->allowance = (int)$data['allowance'];
-            $existing->bonus = (int)$data['bonus'];
-            $existing->deductions = (int)$data['deductions'];
-            $existing->total_salary = $existing->base_salary + $existing->allowance + 
-                                     $existing->bonus - $existing->deductions;
-            $existing->notes = $data['notes'] ?? null;
-            $existing->status = $newStatus; // Chuyển sang finalized nếu tháng đã kết thúc
+            // Tính lại pro_rated_base để đồng bộ với ngày làm thực tế
+            $calc = $this->calculateSalary($account_id, $month, $year,
+                                           (int)$data['allowance'],
+                                           (int)$data['bonus'],
+                                           (int)$data['deductions']);
+            if (!$calc['success']) return $calc;
+
+            // Update — lưu lương thực tế (pro_rated_base), KHÔNG lưu lương gốc
+            $existing->base_salary  = $calc['pro_rated_base'];
+            $existing->allowance    = $calc['allowance'];
+            $existing->bonus        = $calc['bonus'];
+            $existing->deductions   = $calc['deductions'];
+            $existing->total_salary = $calc['total_salary'];
+            $existing->notes        = $data['notes'] ?? null;
+            $existing->status       = $newStatus;
             
             if ($this->salaryRepo->update($existing)) {
                 $msg = ($newStatus === 'finalized') ? 'Chốt lương chính thức thành công' : 'Cập nhật lương tạm tính thành công';
@@ -738,17 +746,17 @@ class SalaryService {
             }
             
             $record = new SalaryRecord([
-                'account_id' => $account_id,
+                'account_id'  => $account_id,
                 'position_id' => $calc['position_id'],
-                'salary_month' => $month,
+                'salary_month'=> $month,
                 'salary_year' => $year,
-                'base_salary' => $calc['base_salary'],
-                'allowance' => $calc['allowance'],
-                'bonus' => $calc['bonus'],
-                'deductions' => $calc['deductions'],
-                'total_salary' => $calc['total_salary'],
-                'notes' => $data['notes'] ?? null,
-                'status' => $newStatus
+                'base_salary' => $calc['pro_rated_base'],   // Lưu lương thực tế theo ngày công
+                'allowance'   => $calc['allowance'],
+                'bonus'       => $calc['bonus'],
+                'deductions'  => $calc['deductions'],
+                'total_salary'=> $calc['total_salary'],
+                'notes'       => $data['notes'] ?? null,
+                'status'      => $newStatus
             ]);
             
             if ($this->salaryRepo->create($record)) {
