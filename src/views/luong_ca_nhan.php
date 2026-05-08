@@ -70,11 +70,14 @@ if ($is_print) {
     echo '<td class="text-right">' . number_format($total_year,0,',','.') . '</td><td></td></tr>';
     echo '</tbody></table>';
     echo '<p style="margin-top:20px;font-size:11px">Ngày in: ' . date('d/m/Y H:i') . '</p>';
+    $redirect_url = app_url() . '?luong_ca_nhan&year=' . $selected_year . '&month=' . $selected_month . '&print_success=1';
     echo '<script>
     window.addEventListener("afterprint", function() {
-        window.opener
-            ? window.opener.location.href = "<?= app_url() ?>?luong_ca_nhan&year=' . $selected_year . '&month=' . $selected_month . '&print_success=1"
-            : (window.location.href = "<?= app_url() ?>?luong_ca_nhan&year=" . $selected_year . '&month=' . $selected_month . '&print_success=1");
+        if (window.opener) {
+            window.opener.location.href = "' . htmlspecialchars($redirect_url, ENT_QUOTES, 'UTF-8') . '";
+        } else {
+            window.location.href = "' . htmlspecialchars($redirect_url, ENT_QUOTES, 'UTF-8') . '";
+        }
         window.close();
     });
     window.print();
