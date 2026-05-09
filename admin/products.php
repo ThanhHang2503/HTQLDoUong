@@ -10,6 +10,7 @@ $filters = [
     'q' => $_GET['q'] ?? '',
     'category_id' => $_GET['category_id'] ?? 0,
     'status' => $_GET['status'] ?? '',
+    'stock' => $_GET['stock'] ?? '',
     'sale_status' => $_GET['sale_status'] ?? '',
     'price_min' => $_GET['price_min'] ?? '',
     'price_max' => $_GET['price_max'] ?? '',
@@ -30,26 +31,20 @@ $stoppedProducts = adminCountValue($conn, "SELECT COUNT(*) FROM items WHERE sale
 $stockExpr = "(COALESCE((SELECT sm.stock_after FROM stock_movements sm WHERE sm.item_id = i.item_id ORDER BY sm.movement_id DESC LIMIT 1), i.stock_quantity))";
 $lowStockProducts = adminCountValue($conn, "SELECT COUNT(*) FROM items i WHERE " . $stockExpr . " < 10");
 
-$buildStatusUrl = static function (string $saleStatus) use ($filters): string {
-    $query = $_GET;
+$buildStatusUrl = static function (string $saleStatus): string {
     if ($saleStatus === '') {
-        unset($query['sale_status']);
-    } else {
-        $query['sale_status'] = $saleStatus;
+        return $_SERVER['PHP_SELF'];
     }
 
-    return $_SERVER['PHP_SELF'] . '?' . http_build_query($query);
+    return $_SERVER['PHP_SELF'] . '?sale_status=' . rawurlencode($saleStatus);
 };
 
-$buildStockUrl = static function (?string $stockFilter) use ($filters): string {
-    $query = $_GET;
-    if ($stockFilter === null || $stockFilter === '') {
-        unset($query['stock']);
-    } else {
-        $query['stock'] = $stockFilter;
+$buildStockUrl = static function (string $stockFilter): string {
+    if ($stockFilter === '') {
+        return $_SERVER['PHP_SELF'];
     }
 
-    return $_SERVER['PHP_SELF'] . '?' . http_build_query($query);
+    return $_SERVER['PHP_SELF'] . '?stock=' . rawurlencode($stockFilter);
 };
 
 $currentSaleStatus = (string) ($filters['sale_status'] ?? '');
