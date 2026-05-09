@@ -21,7 +21,6 @@ $filters = [
 $suppliers = adminFetchSuppliers($conn, $filters);
 
 $supplierCount = adminCountValue($conn, 'SELECT COUNT(*) FROM suppliers');
-$activeSuppliers = adminCountValue($conn, "SELECT COUNT(*) FROM suppliers WHERE status = 'active'");
 
 require_once __DIR__ . '/../src/views/layout.php';
 renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
@@ -39,10 +38,6 @@ renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
                             <span>Tổng nhà cung cấp</span>
                             <strong><?= $supplierCount ?></strong>
                         </div>
-                        <div class="stat-pill">
-                            <span>NC cung cấp hoạt động</span>
-                            <strong><?= $activeSuppliers ?></strong>
-                        </div>
                     </div>
                 </div>
             </header>
@@ -52,16 +47,14 @@ renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
 
             <?php
             renderAdminTable(
-                ['Mã', 'Mã NCC', 'Tên nhà cung cấp', 'Người liên hệ', 'Trạng thái', 'Ngày tạo'],
+                ['Mã', 'Mã NCC', 'Tên nhà cung cấp', 'Người liên hệ', 'Ngày tạo'],
                 $suppliers,
                 function (array $row): string {
-                    $statusClass = $row['status'] === 'active' ? 'text-bg-success' : 'text-bg-secondary';
                     return '<tr>'
                         . '<td>' . (int) $row['supplier_id'] . '</td>'
                         . '<td>' . adminText($row['supplier_code']) . '</td>'
                         . '<td>' . adminText($row['supplier_name']) . '</td>'
                         . '<td>' . adminText($row['contact_name'] ?? '-') . '</td>'
-                        . '<td><span class="badge ' . $statusClass . '">' . adminText($row['status']) . '</span></td>'
                         . '<td>' . adminDateTime($row['created_at'] ?? null) . '</td>'
                         . '</tr>';
                 }

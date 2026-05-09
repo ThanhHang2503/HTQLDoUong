@@ -9,7 +9,11 @@ function renderAdminTable(array $headers, array $rows, callable $rowRenderer): v
                 <thead>
                     <tr>
                         <?php foreach ($headers as $header) : ?>
-                            <th scope="col"><?= adminText($header) ?></th>
+                            <?php if (is_array($header) && array_key_exists('html', $header)) : ?>
+                                <th scope="col"><?= $header['html'] ?></th>
+                            <?php else : ?>
+                                <th scope="col"><?= adminText($header) ?></th>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </tr>
                 </thead>

@@ -10,6 +10,7 @@ $filters = [
     'q' => $_GET['q'] ?? '',
     'category_id' => $_GET['category_id'] ?? 0,
     'status' => $_GET['status'] ?? '',
+    'sale_status' => $_GET['sale_status'] ?? '',
     'price_min' => $_GET['price_min'] ?? '',
     'price_max' => $_GET['price_max'] ?? '',
     'date_from' => $_GET['date_from'] ?? '',
@@ -23,8 +24,40 @@ $categories = $categoriesResult ? mysqli_fetch_all($categoriesResult, MYSQLI_ASS
 
 $products = adminFetchProducts($conn, $filters);
 
-$productCount = adminCountValue($conn, 'SELECT COUNT(*) FROM items');
-$activeProducts = adminCountValue($conn, "SELECT COUNT(*) FROM items WHERE item_status = 'active'");
+$productCount = count($products);
+$sellingProducts = adminCountValue($conn, "SELECT COUNT(*) FROM items WHERE sale_status = 'selling'");
+$stoppedProducts = adminCountValue($conn, "SELECT COUNT(*) FROM items WHERE sale_status = 'stopped'");
+$stockExpr = "(COALESCE((SELECT sm.stock_after FROM stock_movements sm WHERE sm.item_id = i.item_id ORDER BY sm.movement_id DESC LIMIT 1), i.stock_quantity))";
+$lowStockProducts = adminCountValue($conn, "SELECT COUNT(*) FROM items i WHERE " . $stockExpr . " < 10");
+
+$buildStatusUrl = static function (string $saleStatus) use ($filters): string {
+    $query = $_GET;
+    if ($saleStatus === '') {
+        unset($query['sale_status']);
+    } else {
+        $query['sale_status'] = $saleStatus;
+    }
+
+    return $_SERVER['PHP_SELF'] . '?' . http_build_query($query);
+};
+
+$buildStockUrl = static function (?string $stockFilter) use ($filters): string {
+    $query = $_GET;
+    if ($stockFilter === null || $stockFilter === '') {
+        unset($query['stock']);
+    } else {
+        $query['stock'] = $stockFilter;
+    }
+
+    return $_SERVER['PHP_SELF'] . '?' . http_build_query($query);
+};
+
+$currentSaleStatus = (string) ($filters['sale_status'] ?? '');
+$currentStockFilter = (string) ($filters['stock'] ?? '');
+
+$cardClass = static function (bool $active): string {
+    return 'stat-pill text-decoration-none text-reset ' . ($active ? 'border border-primary bg-white shadow-sm' : '');
+};
 
 require_once __DIR__ . '/../src/views/layout.php';
 renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
@@ -37,14 +70,26 @@ renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
                         <h1 class="admin-title mb-2">Sản phẩm</h1>
                         <p class="text-muted mb-0">Tìm kiếm cơ bản, lọc nâng cao và sắp xếp theo nhiều tiêu chí.</p>
                     </div>
-                    <div class="d-flex gap-3 flex-wrap">
-                        <div class="stat-pill">
-                            <span>Tổng sản phẩm</span>
-                            <strong><?= $productCount ?></strong>
+                    <div class="d-flex flex-column gap-3">
+                        <div class="d-flex gap-3 flex-wrap">
+                            <a href="<?= htmlspecialchars($buildStatusUrl('')) ?>" class="<?= $cardClass($currentSaleStatus === '' && $currentStockFilter === '') ?>">
+                                <span>Số sản phẩm hiển thị</span>
+                                <strong><?= $productCount ?></strong>
+                            </a>
+                            <a href="<?= htmlspecialchars($buildStatusUrl('selling')) ?>" class="<?= $cardClass($currentSaleStatus === 'selling') ?>">
+                                <span>SP đang bán</span>
+                                <strong><?= $sellingProducts ?></strong>
+                            </a>
                         </div>
-                        <div class="stat-pill">
-                            <span>SP hoạt động</span>
-                            <strong><?= $activeProducts ?></strong>
+                        <div class="d-flex gap-3 flex-wrap">
+                            <a href="<?= htmlspecialchars($buildStatusUrl('stopped')) ?>" class="<?= $cardClass($currentSaleStatus === 'stopped') ?>">
+                                <span>SP ngừng bán</span>
+                                <strong><?= $stoppedProducts ?></strong>
+                            </a>
+                            <a href="<?= htmlspecialchars($buildStockUrl('critical')) ?>" class="<?= $cardClass($currentStockFilter === 'critical') ?>">
+                                <span>SP tồn kho thấp</span>
+                                <strong><?= $lowStockProducts ?></strong>
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -55,10 +100,12 @@ renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
 
             <?php
             renderAdminTable(
-                ['Mã', 'Ảnh', 'Tên', 'Danh mục', 'Giá', 'Trạng thái', 'Ngày tạo'],
+                ['Mã', 'Ảnh', 'Tên', 'Danh mục', 'Giá', 'Tồn', 'Trạng thái bán', 'Ngày tạo'],
                 $products,
                 function (array $row): string {
-                    $statusClass = $row['item_status'] === 'active' ? 'text-bg-success' : 'text-bg-secondary';
+                    $saleStatus = (string) ($row['sale_status'] ?? 'selling');
+                    $statusClass = $saleStatus === 'selling' ? 'text-bg-success' : 'text-bg-danger';
+                    $statusLabel = $saleStatus === 'selling' ? 'Đang bán' : 'Ngừng bán';
                     
                     // Đồng bộ logic hiển thị ảnh với src/views/sanpham.php
                     $id_img   = 'img/' . (int)$row['item_id'] . '.jpg';
@@ -81,7 +128,8 @@ renderAppLayoutStart($_SESSION['full_name'] ?? 'Admin', 'admin');
                         . '<td>' . adminText($row['item_name']) . '</td>'
                         . '<td>' . adminText($row['category_name'] ?? '-') . '</td>'
                         . '<td>' . adminMoney($row['unit_price']) . '</td>'
-                        . '<td><span class="badge ' . $statusClass . '">' . adminText($row['item_status']) . '</span></td>'
+                        . '<td>' . ((isset($row['stock_quantity']) && $row['stock_quantity'] !== null) ? (int)$row['stock_quantity'] : '-') . '</td>'
+                        . '<td><span class="badge ' . $statusClass . '">' . adminText($statusLabel) . '</span></td>'
                         . '<td>' . adminDateTime($row['added_date'] ?? null) . '</td>'
                         . '</tr>';
                 }

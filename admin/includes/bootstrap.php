@@ -52,6 +52,9 @@ function adminFetchProducts(mysqli $conn, array $filters): array
     $priceMax = trim((string) ($filters['price_max'] ?? ''));
     $dateFrom = trim((string) ($filters['date_from'] ?? ''));
     $dateTo = trim((string) ($filters['date_to'] ?? ''));
+    $stockFilter = trim((string) ($filters['stock'] ?? ''));
+    $saleStatus = trim((string) ($filters['sale_status'] ?? ''));
+    $stockExpr = "(COALESCE((SELECT sm.stock_after FROM stock_movements sm WHERE sm.item_id = i.item_id ORDER BY sm.movement_id DESC LIMIT 1), i.stock_quantity))";
 
     if ($search !== '') {
         $escaped = mysqli_real_escape_string($conn, $search);
@@ -86,6 +89,22 @@ function adminFetchProducts(mysqli $conn, array $filters): array
         $conditions[] = "DATE(i.added_date) <= '" . mysqli_real_escape_string($conn, $dateTo) . "'";
     }
 
+    if ($stockFilter !== '') {
+        if ($stockFilter === 'critical') {
+            $conditions[] = $stockExpr . ' < 10';
+        } elseif ($stockFilter === 'low') {
+            $conditions[] = $stockExpr . ' < 50';
+        } elseif ($stockFilter === 'out') {
+            $conditions[] = $stockExpr . ' = 0';
+        } elseif ($stockFilter === 'in') {
+            $conditions[] = $stockExpr . ' > 0';
+        }
+    }
+
+    if ($saleStatus !== '' && in_array($saleStatus, ['selling', 'stopped'], true)) {
+        $conditions[] = "i.sale_status = '" . mysqli_real_escape_string($conn, $saleStatus) . "'";
+    }
+
     $sort = (string) ($filters['sort'] ?? 'date');
     $direction = (string) ($filters['direction'] ?? 'desc');
     $orderBy = adminBuildOrderBy([
@@ -95,7 +114,7 @@ function adminFetchProducts(mysqli $conn, array $filters): array
         'code' => 'i.item_id',
     ], $sort, $direction, 'i.added_date');
 
-    $sql = "SELECT i.item_id, i.item_name, i.description, i.unit_price, i.added_date, i.item_status, i.item_image, c.category_id, c.category_name
+        $sql = "SELECT i.item_id, i.item_name, i.description, i.unit_price, i.added_date, i.item_status, i.sale_status, i.item_image, " . $stockExpr . " AS stock_quantity, c.category_id, c.category_name
             FROM items i
             LEFT JOIN category c ON c.category_id = i.category_id";
 
